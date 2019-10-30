@@ -243,7 +243,6 @@ def process_restart(args):
     soln = [NativeReader(args.soln)]
 
     if args.prevsolns:
-        print('previous solution files:', args.prevsolns[0])
         prevsolns = list()
         for sf in args.prevsolns:
             prevsolns.append(NativeReader(sf))

@@ -27,7 +27,6 @@ class BaseDualIntegrator(BaseIntegrator):
             for eb, et in zip(self.system.ele_banks, self.system.ele_map.keys()):
                 sn = initsoln[i]['soln_{0}_p{1}'.format(et, rallocs.prank)]
                 eb[idx].set(sn)
-                print('previous solution is set', i, et, rallocs.prank)
 
         # Event handlers for advance_to
         self.completed_step_handlers = proxylist(self._get_plugins())
