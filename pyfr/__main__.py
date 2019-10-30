@@ -234,7 +234,7 @@ def _process_common(args, mesh, soln, cfg):
 
 def process_run(args):
     _process_common(
-        args, NativeReader(args.mesh), None, Inifile.load(args.cfg)
+        args, NativeReader(args.mesh), [None], Inifile.load(args.cfg)
     )
 
 

@@ -20,7 +20,10 @@ class BaseDualIntegrator(BaseIntegrator):
         )
 
         for i in range(1, len(initsoln)):
-            idx = self.pseudointegrator._stepper_regidx[i]
+            if hasattr(self.pseudointegrator, 'pintg'):
+                idx = self.pseudointegrator.pintg._stepper_regidx[i]
+            else:
+                idx = self.pseudointegrator._stepper_regidx[i]
             for eb, et in zip(self.system.ele_banks, self.system.ele_map.keys()):
                 sn = initsoln[i]['soln_{0}_p{1}'.format(et, rallocs.prank)]
                 eb[idx].set(sn)
