@@ -92,6 +92,8 @@ def main():
     ap_restart.add_argument('soln', help='solution file')
     ap_restart.add_argument('cfg', nargs='?', type=FileType('r'),
                             help='new config file')
+    ap_restart.add_argument('--prevsolns', nargs='+',
+                            help='previous solutions for bdf')
     ap_restart.set_defaults(process=process_restart)
 
     # Options common to run and restart
@@ -238,17 +240,25 @@ def process_run(args):
 
 def process_restart(args):
     mesh = NativeReader(args.mesh)
-    soln = NativeReader(args.soln)
+    soln = [NativeReader(args.soln)]
+
+    if args.prevsolns:
+        print('previous solution files:', args.prevsolns[0])
+        prevsolns = list()
+        for sf in args.prevsolns:
+            prevsolns.append(NativeReader(sf))
+
+        soln.extend(prevsolns)
 
     # Ensure the solution is from the mesh we are using
-    if soln['mesh_uuid'] != mesh['mesh_uuid']:
+    if soln[0]['mesh_uuid'] != mesh['mesh_uuid']:
         raise RuntimeError('Invalid solution for mesh.')
 
     # Process the config file
     if args.cfg:
         cfg = Inifile.load(args.cfg)
     else:
-        cfg = Inifile(soln['config'])
+        cfg = Inifile(soln[0]['config'])
 
     _process_common(args, mesh, soln, cfg)
 

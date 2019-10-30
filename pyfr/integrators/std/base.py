@@ -15,7 +15,7 @@ class BaseStdIntegrator(BaseCommon, BaseIntegrator):
         self.nregs = self._stepper_nregs
 
         # Construct the relevant system
-        self.system = systemcls(backend, rallocs, mesh, initsoln,
+        self.system = systemcls(backend, rallocs, mesh, initsoln[0],
                                 nregs=self.nregs, cfg=cfg)
 
         # Storage for register banks and current index

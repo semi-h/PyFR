@@ -15,7 +15,7 @@ class BaseDualPseudoIntegrator(BaseCommon):
                  initsoln, cfg, stepper_coeffs, dt):
         self.backend = backend
         self.rallocs = rallocs
-        self.isrestart = initsoln is not None
+        self.isrestart = initsoln[0] is not None
         self.cfg = cfg
         self._dt = dt
 
@@ -47,7 +47,7 @@ class BaseDualPseudoIntegrator(BaseCommon):
         self._stepper_coeffs = stepper_coeffs
 
         # Construct the relevant system
-        self.system = systemcls(backend, rallocs, mesh, initsoln,
+        self.system = systemcls(backend, rallocs, mesh, initsoln[0],
                                 nregs=self.nregs, cfg=cfg)
 
         # Storage for register banks and current index

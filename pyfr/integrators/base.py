@@ -17,9 +17,9 @@ class BaseIntegrator(object):
     def __init__(self, backend, rallocs, mesh, initsoln, cfg):
         self.backend = backend
         self.rallocs = rallocs
-        self.isrestart = initsoln is not None
+        self.isrestart = initsoln[0] is not None
         self.cfg = cfg
-        self.prevcfgs = {f: initsoln[f] for f in initsoln or []
+        self.prevcfgs = {f: initsoln[0][f] for f in initsoln[0] or []
                          if f.startswith('config-')}
 
         # Start time
@@ -28,7 +28,7 @@ class BaseIntegrator(object):
 
         # Current time; defaults to tstart unless restarting
         if self.isrestart:
-            stats = Inifile(initsoln['stats'])
+            stats = Inifile(initsoln[0]['stats'])
             self.tcurr = stats.getfloat('solver-time-integrator', 'tcurr')
         else:
             self.tcurr = self.tstart
