@@ -46,6 +46,11 @@ class BaseDualPseudoStepper(BaseDualPseudoIntegrator):
         self._prepare_reg_banks(fout, self._idxcurr, *self._stepper_regidx)
         self._queue % axnpby(1, *svals)
 
+        # Multiply fout by the preconditioner
+        # then divide by dtau to make all steppers compatible
+        if self.pseudoimp:
+            self.system.precondition(fout, self._dtau)
+
 
 class DualEulerPseudoStepper(BaseDualPseudoStepper):
     pseudo_stepper_name = 'euler'

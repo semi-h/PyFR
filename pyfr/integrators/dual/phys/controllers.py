@@ -37,5 +37,8 @@ class DualNoneController(BaseDualController):
             raise ValueError('Advance time is in the past')
 
         while self.tcurr < t:
+            if self.pseudointegrator.pseudoimp:
+                self.system.get_preconditioner(self.pseudointegrator._idxcurr,
+                                               self.pseudointegrator._dtau, 1)
             self.pseudointegrator.pseudo_advance(self.tcurr)
             self._accept_step(self.pseudointegrator._idxcurr)

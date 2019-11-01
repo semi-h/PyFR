@@ -27,6 +27,8 @@ class BaseDualPseudoIntegrator(BaseCommon):
         self.maxniters = cfg.getint(sect, 'pseudo-niters-max', 0)
         self.minniters = cfg.getint(sect, 'pseudo-niters-min', 0)
 
+        self.pseudoimp = cfg.getbool(sect, 'pseudo-implicit', False)
+
         if self.maxniters < self.minniters:
             raise ValueError('The maximum number of pseudo-iterations must '
                              'be greater than or equal to the minimum')

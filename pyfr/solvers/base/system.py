@@ -176,6 +176,57 @@ class BaseSystem(object, metaclass=ABCMeta):
     def rhs(self, t, uinbank, foutbank):
         pass
 
+    def get_preconditioner(self, u, dtmarch, adiag):
+        # construct the jacobian and invert before storing
+        # get the solution from device to host
+        # perturb and call rhs to construct to element jacobians
+        # invert element jacobian in place
+        import numpy as np
+        eps = 1e-8
+        base_soln = self.ele_scal_upts(u)
+        self.rhs(0, u, u)
+        base_derv = self.ele_scal_upts(u)
+        self.restore_soln(u, base_soln)
+
+        self.jacob = list()
+        for i, (base_elemat, eb) in enumerate(zip(base_soln, self.ele_banks)):
+            size = base_elemat.shape[0]*base_elemat.shape[1]
+            self.jacob.append(list())
+            for i_elem in range(base_elemat.shape[2]):
+                self.jacob[i].append(np.zeros((size, size)))
+                for i_nvar in range(base_elemat.shape[1]):
+                    for i_u in range(base_elemat.shape[0]):
+                        self.restore_soln(u, base_soln)
+                        elemat = base_elemat.copy()
+                        elemat[i_u, i_nvar, i_elem] += eps
+                        eb[u].set(elemat)
+                        self.rhs(0, u, u)
+                        pert_derv = self.ele_scal_upts(u)
+                        diff = -(pert_derv[i][:, :, i_elem]
+                                 - base_derv[i][:, :, i_elem])/eps
+                        ncol = i_u*base_elemat.shape[1] + i_nvar
+                        self.jacob[i][i_elem][:, ncol] = diff.reshape(-1)
+                # invert jacob here
+                self.jacob[i][i_elem] *= adiag
+                self.jacob[i][i_elem] += np.identity(size)/dtmarch
+                self.jacob[i][i_elem] = np.linalg.inv(self.jacob[i][i_elem])
+            # write base_soln back to register
+            eb[u].set(base_elemat)
+
+    def restore_soln(self, u, soln):
+        for elemat, eb in zip(soln, self.ele_banks):
+            eb[u].set(elemat)
+
+    def precondition(self, r, dtmarch):
+        derv = self.ele_scal_upts(r)
+        for i, (elemat, eb) in enumerate(zip(derv, self.ele_banks)):
+            s1, s2 = elemat.shape[0], elemat.shape[1]
+            for i_elem in range(elemat.shape[2]):
+                solnary = elemat[:, :, i_elem].reshape(-1)
+                solnary = self.jacob[i][i_elem].dot(solnary)/dtmarch
+                elemat[:, :, i_elem] = solnary.reshape((s1, s2))
+            eb[r].set(elemat)
+
     def filt(self, uinoutbank):
         self.eles_scal_upts_inb.active = uinoutbank
 
