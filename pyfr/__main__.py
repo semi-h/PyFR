@@ -60,6 +60,17 @@ def main():
                               'load-balancing mixed meshes')
     ap_partition.set_defaults(process=process_partition)
 
+    # Color command
+    ap_color = sp.add_parser('color', help='color --help')
+    ap_color.add_argument('mesh', help='input mesh file')
+    ap_color.add_argument('outd', help='output directory')
+    ap_color.add_argument('-nc', dest='nminclr', type=int, default=4)
+    ap_color.add_argument('-d', dest='dist', type=int, default=2)
+    ap_color.add_argument('-t', dest='order', type=int, default=3,
+                          help='target polynomial order; aids in '
+                          'load-balancing mixed meshes')
+    ap_color.set_defaults(process=process_color)
+
     # Export command
     ap_export = sp.add_parser('export', help='export --help')
     ap_export.add_argument('meshf', help='PyFR mesh file to be converted')
@@ -176,6 +187,93 @@ def process_partition(args):
         with h5py.File(path, 'w') as f:
             for k, v in data.items():
                 f[k] = v
+
+
+def process_color(args):
+    # Ensure outd is a directory
+    if not os.path.isdir(args.outd):
+        raise ValueError('Invalid output directory')
+
+    mesh = NativeReader(args.mesh)
+
+    class GraphBuilder(BasePartitioner):
+        def __init__(self, order):
+            self.elewts = self.elewtsmap[min(order, max(self.elewtsmap))]
+
+    graphbuilder = GraphBuilder(order=args.order)
+    graph, vetimap = graphbuilder._construct_graph(mesh)
+
+    colors = set(range(args.nminclr))
+
+    # vclr is the color array
+    import numpy as np
+    vclr = -np.ones(len(graph.vtab)-1, dtype=int)  # type: np.ndarray
+    print('number of elements', len(vclr))
+    print('number of colors', len(colors), colors)
+    neighs = set()
+    lclrs = set()
+    clrwts = {c: 0 for c in colors}
+
+    for i in range(len(graph.vtab[:-1])):
+        neighs.update(set(graph.etab[graph.vtab[i]:graph.vtab[i+1]]))
+
+        if args.dist == 2:
+            for d2n in graph.etab[graph.vtab[i]:graph.vtab[i+1]]:
+                neighs.update(set(graph.etab[graph.vtab[d2n]:graph.vtab[d2n+1]]))
+
+        for neigh in neighs:
+            lclrs.add(vclr[neigh]) if vclr[neigh] != -1 else None
+
+        availclrs = colors.difference(lclrs)
+
+        if len(availclrs) == 0:
+            availclr = len(colors)
+            colors.add(availclr)
+            clrwts[availclr] = 0
+        else:
+            redclrwts = dict((k, clrwts[k]) for k in availclrs)
+            availclr = min(redclrwts, key=redclrwts.get)
+
+        vclr[i] = availclr
+        clrwts[availclr] += 1 #graph.vwts[i]
+
+        neighs.clear()
+        lclrs.clear()
+
+    # Check coloring
+    for i in range(len(graph.vtab[:-1])):
+        neighs.update(set(graph.etab[graph.vtab[i]:graph.vtab[i+1]]))
+
+        if args.dist == 2:
+            for d2n in graph.etab[graph.vtab[i]:graph.vtab[i+1]]:
+                neighs.update(set(graph.etab[graph.vtab[d2n]:graph.vtab[d2n+1]]))
+
+            neighs.remove(i)
+
+        for neigh in neighs:
+            lclrs.add(vclr[neigh])
+
+        if vclr[i] in lclrs:
+            print('Something wrong in the coloring :(')
+
+        neighs.clear()
+        lclrs.clear()
+
+    print('number of colors:', len(colors), colors)
+    print(clrwts)
+
+    colorlist = [[] for i in range(len(colors))]
+
+    for i, veti in enumerate(vetimap):
+        colorlist[vclr[i]].append(veti)
+
+    path = os.path.join(args.outd, os.path.basename(args.mesh.rstrip('/')))
+
+    with h5py.File(path, 'w') as f:
+        for k, v in mesh.items():
+            f[k] = v
+        for c in colors:
+            f['color_{0}'.format(c)] = np.array(colorlist[c], dtype='S4,i4')
 
 
 def process_export(args):
