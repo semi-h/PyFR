@@ -214,10 +214,14 @@ class BaseSystem(object, metaclass=ABCMeta):
 
         self.jacob = list()
         maxsize = 0
+
         for i, base_elemat in enumerate(base_soln):
             self.jacob.append(list())
             size = base_elemat.shape[0]*base_elemat.shape[1]
-            self.jacob[i] = [np.zeros((size, size))] * base_elemat.shape[2]
+
+            for j in range(base_elemat.shape[2]):
+                self.jacob[i].append(np.zeros((size, size)))
+
             if size > maxsize:
                 maxsize = size
 
@@ -242,26 +246,26 @@ class BaseSystem(object, metaclass=ABCMeta):
 
                 self.rhs(0, u, u)
                 pert_derv = self.ele_scal_upts(u)
+                self.restore_soln(u, base_soln)
+
                 for i, base_elemat in enumerate(base_soln):
                     size = base_elemat.shape[0]*base_elemat.shape[1]
 
                     if ncol >= size:
                         continue
 
-                    for i_elem in range(base_elemat.shape[2]):
-                        diff = -(pert_derv[i][..., i_elem]
-                                 - base_derv[i][..., i_elem])/eps
+                    for i_elem in self.clrmap[color][self.ele_types[i]]:
+                        diff = -(pert_derv[i][:, :, i_elem]
+                                 - base_derv[i][:, :, i_elem])/eps
                         self.jacob[i][i_elem][:, ncol] = diff.reshape(-1)
 
-                self.restore_soln(u, base_soln)
+        for i, base_elemat in enumerate(base_soln):
+            size = base_elemat.shape[0]*base_elemat.shape[1]
 
-            for i, base_elemat in enumerate(base_soln):
-                for i_elem in range(base_elemat.shape[2]):
-                    size = base_elemat.shape[0]*base_elemat.shape[1]
-
-                    self.jacob[i][i_elem] *= adiag
-                    self.jacob[i][i_elem] += np.identity(size)/dtmarch
-                    self.jacob[i][i_elem] = np.linalg.inv(self.jacob[i][i_elem])
+            for i_elem in range(base_elemat.shape[2]):
+                self.jacob[i][i_elem] *= adiag
+                self.jacob[i][i_elem] += np.identity(size)/dtmarch
+                self.jacob[i][i_elem] = np.linalg.inv(self.jacob[i][i_elem])
 
     def restore_soln(self, u, soln):
         for elemat, eb in zip(soln, self.ele_banks):
