@@ -196,17 +196,56 @@ def process_color(args):
 
     mesh = NativeReader(args.mesh)
 
+    import numpy as np
+    # Preprocess mesh to have shorter distance aligned with ksi coordinate
+    if True:
+        rlist = list()
+        o = int(np.sqrt(mesh['spt_quad_p0'].shape[0])) - 1
+        ndim = mesh['spt_quad_p0'].shape[2]
+        refelem = np.zeros(((o+1)**2, ndim))
+
+        newm = dict()
+        for dataset in mesh:
+            newm[dataset] = mesh[dataset]
+
+        for i in range(newm['spt_quad_p0'].shape[1]):
+            elem = newm['spt_quad_p0'][:, i, :]
+            dx = 0.5*(abs(elem[o][0] - elem[0][0])
+                      + abs(elem[o*(o+1)][0] - elem[(o+1)*(o+1)-1][0]))
+            dy = 0.5*(abs(elem[o][1] - elem[(o+1)*(o+1)-1][1])
+                      + abs(elem[0][1] - elem[o*(o+1)][1]))
+
+            if dx > dy:
+                # rotate element and add element to the list of rotated
+                rlist.append(i)
+
+                for j in range(o+1):
+                    for k in range(o+1):
+                        refelem[j*(o+1)+k] = elem[(k+1)*(o+1)-j-1]
+
+                newm['spt_quad_p0'][:, i, :] = refelem[:,:]
+
+        print('Number of rotated elements', len(rlist))
+
+        # Fix interface faces
+        for dataset in newm:
+            if 'con' in dataset:
+                for e in newm[dataset][...].flat:
+                    arr = e.astype('U4,i4,i1,i1')
+                    if arr[0] == 'quad':
+                        if arr[1] in rlist:
+                            e[2] = (e[2]-1) % 4
+
     class GraphBuilder(BasePartitioner):
         def __init__(self, order):
             self.elewts = self.elewtsmap[min(order, max(self.elewtsmap))]
 
     graphbuilder = GraphBuilder(order=args.order)
-    graph, vetimap = graphbuilder._construct_graph(mesh)
+    graph, vetimap = graphbuilder._construct_graph(newm)
 
     colors = set(range(args.nminclr))
 
     # vclr is the color array
-    import numpy as np
     vclr = -np.ones(len(graph.vtab)-1, dtype=int)  # type: np.ndarray
     print('number of elements', len(vclr))
     print('number of colors', len(colors), colors)
@@ -270,7 +309,7 @@ def process_color(args):
     path = os.path.join(args.outd, os.path.basename(args.mesh.rstrip('/')))
 
     with h5py.File(path, 'w') as f:
-        for k, v in mesh.items():
+        for k, v in newm.items():
             f[k] = v
         for c in colors:
             f['color_{0}'.format(c)] = np.array(colorlist[c], dtype='S4,i4')
