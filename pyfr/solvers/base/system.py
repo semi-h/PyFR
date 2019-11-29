@@ -193,7 +193,7 @@ class BaseSystem(object, metaclass=ABCMeta):
                     kernels[pn, kn].append(kgetter())
 
     @abstractmethod
-    def rhs(self, t, uinbank, foutbank):
+    def rhs(self, t, uinbank, foutbank, xi=False):
         pass
 
     def get_preconditioner(self, u, dtmarch, adiag):
@@ -207,7 +207,7 @@ class BaseSystem(object, metaclass=ABCMeta):
 
         base_soln = self.ele_scal_upts(u)
 
-        self.rhs(0, u, u)
+        self.rhs(0, u, u, xi=True)
         base_derv = self.ele_scal_upts(u)
 
         self.restore_soln(u, base_soln)
@@ -246,7 +246,7 @@ class BaseSystem(object, metaclass=ABCMeta):
 
                     eb[u].set(elemat)
 
-                self.rhs(0, u, u)
+                self.rhs(0, u, u, xi=True)
                 pert_derv = self.ele_scal_upts(u)
                 self.restore_soln(u, base_soln)
 

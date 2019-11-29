@@ -86,6 +86,17 @@ class BaseAdvectionElements(BaseElements):
             beta=1.0
         )
 
+        self.kernels['tdivtpcorf_xi'] = lambda: backend.kernel(
+            'mul', self.opmat('M19 - M39*M2'), self._vect_upts,
+            out=self.scal_upts_outb
+        )
+
+        # Second flux correction kernel
+        self.kernels['tdivtconf_xi'] = lambda: backend.kernel(
+            'mul', self.opmat('M39'), self._scal_fpts, out=self.scal_upts_outb,
+            beta=1.0
+        )
+
         # Transformed to physical divergence kernel + source term
         if divfluxaa:
             plocqpts = self.ploc_at('qpts') if plocsrc else None

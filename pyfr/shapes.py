@@ -160,6 +160,22 @@ class BaseShape(object):
         return np.linalg.solve(ub.vdm, A[:,None]*ub.vdm).T
 
     @lazyprop
+    def m19(self):
+        m = np.rollaxis(self.ubasis.jac_nodal_basis_at(self.upts), 2)
+        m = m.reshape(self.nupts, -1)
+        m[:, self.nupts:] = 0
+        return m
+
+    @lazyprop
+    def m39(self):
+        m = self.gbasis_at(self.upts)
+        i, j = m.shape
+        step = j//4
+        m[:, :step] = 0
+        m[:, 2*step:3*step] = 0
+        return m
+
+    @lazyprop
     def nupts(self):
         n = self.order + 1
         return np.polyval(self.npts_coeffs, n) // self.npts_cdenom
