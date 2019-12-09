@@ -196,7 +196,7 @@ class BaseSystem(object, metaclass=ABCMeta):
     def rhs(self, t, uinbank, foutbank, xi=False):
         pass
 
-    def get_preconditioner(self, u, dtmarch, adiag):
+    def get_preconditioner(self, u, dtmarch, adiag, lineimp):
         # construct the jacobian and invert before storing
         # get the solution from device to host
         # perturb and call rhs to construct to element jacobians
@@ -207,7 +207,7 @@ class BaseSystem(object, metaclass=ABCMeta):
 
         base_soln = self.ele_scal_upts(u)
 
-        self.rhs(0, u, u, xi=True)
+        self.rhs(0, u, u, xi=lineimp)
         base_derv = self.ele_scal_upts(u)
 
         self.restore_soln(u, base_soln)
@@ -246,7 +246,7 @@ class BaseSystem(object, metaclass=ABCMeta):
 
                     eb[u].set(elemat)
 
-                self.rhs(0, u, u, xi=True)
+                self.rhs(0, u, u, xi=lineimp)
                 pert_derv = self.ele_scal_upts(u)
                 self.restore_soln(u, base_soln)
 

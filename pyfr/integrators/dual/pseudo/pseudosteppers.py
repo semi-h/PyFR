@@ -65,7 +65,7 @@ class DualEulerPseudoStepper(BaseDualPseudoStepper):
 
     @property
     def _pseudo_stepper_nregs(self):
-        return 2
+        return 4
 
     @property
     def _pseudo_stepper_order(self):
@@ -75,15 +75,42 @@ class DualEulerPseudoStepper(BaseDualPseudoStepper):
         add = self._add
         rhs = self._rhs_with_dts
 
-        r0, r1 = self._pseudo_stepper_regidx
+        r0, r1, r2, r3 = self._pseudo_stepper_regidx
 
         if r0 != self._idxcurr:
             r0, r1 = r1, r0
 
         rhs(t, r0, r1)
-        add(0, r1, 1, r0, self._dtau, r1)
 
+        if self.pslinesearch is False:
+            add(0, r1, 1, r0, self._dtau, r1)
+        else:
+            from skopt import dummy_minimize, gp_minimize
+
+            alpha = 1.0
+            res = dummy_minimize(self.objective_func, [(0.0, 1.4)], n_calls=11,
+                              random_state=123, verbose=False, x0=[alpha])
+            alpha = res.x
+
+            add(0, r1, 1, r0, alpha[0]*self._dtau, r1)
+        
         return r1, r0
+
+    def objective_func(self, alpha):
+        add = self._add
+        rhs = self._rhs_with_dts
+
+        r0, r1, r2, r3 = self._pseudo_stepper_regidx
+
+        add(0, r2, 1, r0, alpha[0]*self._dtau, r1)
+
+        rhs(0, r2, r3)
+        
+        # take r3 norm, return it
+        err = self._resid(self._dtau, r3)
+        err = np.linalg.norm(err)
+
+        return err
 
 
 class DualTVDRK3PseudoStepper(BaseDualPseudoStepper):

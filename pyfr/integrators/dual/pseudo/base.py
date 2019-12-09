@@ -28,6 +28,9 @@ class BaseDualPseudoIntegrator(BaseCommon):
         self.minniters = cfg.getint(sect, 'pseudo-niters-min', 0)
 
         self.pseudoimp = cfg.getbool(sect, 'pseudo-implicit', False)
+        self.pslineimp = cfg.getbool(sect, 'pseudo-lineimp', False)
+        self.psfreeze = cfg.getint(sect, 'pseudo-freeze', 1)
+        self.pslinesearch = cfg.getbool(sect, 'pseudo-linesearch', False)
 
         if self.maxniters < self.minniters:
             raise ValueError('The maximum number of pseudo-iterations must '

@@ -36,9 +36,14 @@ class DualNoneController(BaseDualController):
         if t < self.tcurr:
             raise ValueError('Advance time is in the past')
 
+        param = 0
+        freeze = self.pseudointegrator.psfreeze
+        lineimp = self.pseudointegrator.pslineimp
         while self.tcurr < t:
-            if self.pseudointegrator.pseudoimp:
+            if self.pseudointegrator.pseudoimp and (param % freeze == 0):
                 self.system.get_preconditioner(self.pseudointegrator._idxcurr,
-                                               self.pseudointegrator._dtau, 1)
+                                               self.pseudointegrator._dtau, 1,
+                                               lineimp=lineimp)
+            param += 1
             self.pseudointegrator.pseudo_advance(self.tcurr)
             self._accept_step(self.pseudointegrator._idxcurr)
