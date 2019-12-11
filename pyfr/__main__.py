@@ -69,6 +69,7 @@ def main():
     ap_color.add_argument('-t', dest='order', type=int, default=3,
                           help='target polynomial order; aids in '
                           'load-balancing mixed meshes')
+    ap_color.add_argument('--align-xi', action='store_true')
     ap_color.set_defaults(process=process_color)
 
     # Export command
@@ -196,37 +197,74 @@ def process_color(args):
 
     mesh = NativeReader(args.mesh)
 
+    newm = dict()
+    for dataset in mesh:
+        newm[dataset] = mesh[dataset]
+
     import numpy as np
     # Preprocess mesh to have shorter distance aligned with ksi coordinate
-    if True:
-        rlist = list()
-        o = int(np.sqrt(mesh['spt_quad_p0'].shape[0])) - 1
-        ndim = mesh['spt_quad_p0'].shape[2]
-        refelem = np.zeros(((o+1)**2, ndim))
-
-        newm = dict()
+    if args.align_xi:
+        elemtype = ''
         for dataset in mesh:
-            newm[dataset] = mesh[dataset]
+            if dataset == 'spt_quad_p0' or dataset == 'spt_hex_p0':
+                elemtype = dataset
+                print('xi alignment will be applied to {0}'.format(elemtype))
 
-        for i in range(newm['spt_quad_p0'].shape[1]):
-            elem = newm['spt_quad_p0'][:, i, :]
-            dx = 0.5*(abs(elem[o][0] - elem[0][0])
-                      + abs(elem[o*(o+1)][0] - elem[(o+1)*(o+1)-1][0]))
-            dy = 0.5*(abs(elem[o][1] - elem[(o+1)*(o+1)-1][1])
-                      + abs(elem[0][1] - elem[o*(o+1)][1]))
+        rlist = list()
+        ccrlist = list()
+        ndim = mesh[elemtype].shape[2]
+        o = int(np.power(mesh[elemtype].shape[0], 1/ndim)) - 1
+        refelem = np.zeros(((o+1)**ndim, ndim))
 
-            if dx > dy:
-                # rotate element and add element to the list of rotated
-                rlist.append(i)
+        def dist(n, m):
+            return np.linalg.norm(n-m)
 
-                for j in range(o+1):
-                    for k in range(o+1):
-                        refelem[j*(o+1)+k] = elem[(k+1)*(o+1)-j-1]
+        for e in range(newm[elemtype].shape[1]):
+            elem = newm[elemtype][:, e, :]
+            dx = 0.5*(dist(elem[o], elem[0])
+                      + dist(elem[o*(o+1)], elem[(o+1)*(o+1)-1]))
+            dy = 0.5*(dist(elem[o], elem[(o+1)*(o+1)-1])
+                      + dist(elem[0], elem[o*(o+1)]))
 
-                newm['spt_quad_p0'][:, i, :] = refelem[:,:]
+            if ndim == 2:
+                if dx > dy:
+                    # rotate element and add element to the list of rotated
+                    rlist.append(e)
 
-        print('Number of rotated elements', len(rlist))
+                    for j in range(o+1):
+                        for k in range(o+1):
+                            refelem[j*(o+1)+k] = elem[(k+1)*(o+1)-j-1]
 
+                    newm['spt_quad_p0'][:, e, :] = refelem[:, :]
+            elif ndim == 3:
+                fn = (o+1)*(o+1)
+                s = o*fn
+                dz = 0.25*(dist(elem[0], elem[s])
+                           + dist(elem[o], elem[o+s])
+                           + dist(elem[o*(o+1)], elem[o*(o+1)+s])
+                           + dist(elem[fn-1], elem[fn-1+s]))
+
+                if dz > dy and dx > dy:
+                    ccrlist.append(e)
+
+                    for i in range(o+1):
+                        for j in range(fn):
+                            refelem[i*fn + j] = elem[i+j*(o+1)]
+
+                    newm['spt_hex_p0'][:, e, :] = refelem[:, :]
+                elif dy > dz and dx > dz:
+                    rlist.append(e)
+
+                    for i in range(fn):
+                        for j in range(o+1):
+                            refelem[i*(o+1)+j] = elem[i+j*fn]
+
+                    newm['spt_hex_p0'][:, e, :] = refelem[:, :]
+
+        print('Number of rotated elements', len(rlist), 'cc', len(ccrlist))
+
+        rotface = [4, 0, 3, 5, 1, 2]
+        rotccface = [1, 4, 5, 2, 0, 3]
         # Fix interface faces
         for dataset in newm:
             if 'con' in dataset:
@@ -235,6 +273,16 @@ def process_color(args):
                     if arr[0] == 'quad':
                         if arr[1] in rlist:
                             e[2] = (e[2]-1) % 4
+                            continue
+
+                    if arr[0] == 'hex':
+                        if arr[1] in rlist:
+                            e[2] = rotface[e[2]]
+                            continue
+
+                        if arr[1] in ccrlist:
+                            e[2] = rotccface[e[2]]
+                            continue
 
     class GraphBuilder(BasePartitioner):
         def __init__(self, order):
@@ -312,7 +360,7 @@ def process_color(args):
         for k, v in newm.items():
             f[k] = v
         for c in colors:
-            f['color_{0}'.format(c)] = np.array(colorlist[c], dtype='S4,i4')
+            f['clr_{0}_p0'.format(c)] = np.array(colorlist[c], dtype='S4,i4')
 
 
 def process_export(args):

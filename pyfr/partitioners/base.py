@@ -65,13 +65,26 @@ class BasePartitioner(object):
 
             return con
 
+        def offset_clr(clrset, pr):
+            clrset = clrset.copy().astype('U4,i4')
+
+            for en, pn in pinf.items():
+                if pn[pr] > 0:
+                    clrset['f1'][np.where(clrset['f0'] == en)] += offs[en][pr]
+
+            return clrset
+
         # Connectivity
         intcon, mpicon, bccon = [], {}, defaultdict(list)
+
+        # Colors
+        clr = defaultdict(list)
 
         for f in mesh:
             mi = re.match(r'con_p(\d+)$', f)
             mm = re.match(r'con_p(\d+)p(\d+)$', f)
             bc = re.match(r'bcon_(.+?)_p(\d+)$', f)
+            cl = re.match(r'clr_(\d+)_p(\d+)$', f)
 
             if mi:
                 intcon.append(offset_con(mesh[f], int(mi.group(1))))
@@ -87,6 +100,9 @@ class BasePartitioner(object):
             elif bc:
                 name, l = bc.group(1), int(bc.group(2))
                 bccon[name].append(offset_con(mesh[f], l))
+            elif cl:
+                color, l = int(cl.group(1)), int(cl.group(2))
+                clr[color].append(offset_clr(mesh[f], l))
 
         # Output data type
         dtype = 'S4,i4,i1,i1'
@@ -99,6 +115,9 @@ class BasePartitioner(object):
 
         for k, v in bccon.items():
             newmesh['bcon_{0}_p0'.format(k)] = np.hstack(v).astype(dtype)
+
+        for k, v in clr.items():
+            newmesh['clr_{0}_p0'.format(k)] = np.hstack(v).astype('S4,i4')
 
         return newmesh
 
@@ -237,6 +256,35 @@ class BasePartitioner(object):
 
         return ret
 
+    def _partition_clr(self, mesh, vparts, vetimap):
+        clr_px = defaultdict(list)
+
+        # Global-to-local element index map
+        eleglmap = defaultdict(list)
+        pcounter = Counter()
+
+        for (etype, eidxg), part in zip(vetimap, vparts):
+            eleglmap[etype].append((part, pcounter[etype, part]))
+            pcounter[etype, part] += 1
+
+        for f in mesh:
+            m = re.match(r'clr_(\d+)_p0$', f)
+            if m:
+                ele = mesh[f].astype('U4,i4')
+
+                for etype, eidx in ele:
+                    part, eidxl = eleglmap[etype][eidx]
+                    pele = (etype, eidxl)
+
+                    clr_px[m.group(1), part].append(pele)
+
+        ret = {}
+
+        for k, v in clr_px.items():
+            ret['clr_{0}_p{1}'.format(*k)] = np.array(v, dtype='S4,i4')
+
+        return ret
+
     def partition(self, mesh):
         # Extract the current UUID from the mesh
         curruuid = mesh['mesh_uuid']
@@ -257,6 +305,9 @@ class BasePartitioner(object):
 
             # Handle the shape points
             newmesh.update(self._partition_spts(mesh, vparts, vetimap))
+
+            # Partition the colors
+            newmesh.update(self._partition_clr(mesh, vparts, vetimap))
         # Short circuit
         else:
             newmesh = mesh
