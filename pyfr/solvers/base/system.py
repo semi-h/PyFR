@@ -115,7 +115,7 @@ class BaseSystem(object, metaclass=ABCMeta):
 
         # Read colors
         for f in mesh:
-            m = re.match('color_(.+?)$', f)
+            m = re.match(r'clr_(\d+?)_p{0}$'.format(rallocs.prank), f)
             if m:
                 cn = m.group(1)
 
@@ -216,7 +216,9 @@ class BaseSystem(object, metaclass=ABCMeta):
         maxsize = 0
 
         for i, base_elemat in enumerate(base_soln):
-            if self.ele_types[i] != 'quad': continue
+            if not (self.ele_types[i] == 'quad' or
+                    self.ele_types[i] == 'hex'):
+                continue
             self.jacob.append(list())
             size = base_elemat.shape[0]*base_elemat.shape[1]
 
@@ -230,7 +232,9 @@ class BaseSystem(object, metaclass=ABCMeta):
             for ncol in range(maxsize):
                 for i, (base_elemat, eb) in enumerate(zip(base_soln,
                                                           self.ele_banks)):
-                    if self.ele_types[i] != 'quad': continue
+                    if not (self.ele_types[i] == 'quad' or
+                            self.ele_types[i] == 'hex'):
+                        continue
                     size = base_elemat.shape[0]*base_elemat.shape[1]
 
                     if ncol >= size:
@@ -251,7 +255,9 @@ class BaseSystem(object, metaclass=ABCMeta):
                 self.restore_soln(u, base_soln)
 
                 for i, base_elemat in enumerate(base_soln):
-                    if self.ele_types[i] != 'quad': continue
+                    if not (self.ele_types[i] == 'quad' or
+                            self.ele_types[i] == 'hex'):
+                        continue
                     size = base_elemat.shape[0]*base_elemat.shape[1]
 
                     if ncol >= size:
@@ -263,7 +269,9 @@ class BaseSystem(object, metaclass=ABCMeta):
                         self.jacob[i][i_elem][:, ncol] = diff.reshape(-1)
 
         for i, base_elemat in enumerate(base_soln):
-            if self.ele_types[i] != 'quad': continue
+            if not (self.ele_types[i] == 'quad' or
+                    self.ele_types[i] == 'hex'):
+                continue
             size = base_elemat.shape[0]*base_elemat.shape[1]
 
             for i_elem in range(base_elemat.shape[2]):
@@ -279,7 +287,9 @@ class BaseSystem(object, metaclass=ABCMeta):
         derv = self.ele_scal_upts(r)
 
         for i, (elemat, eb) in enumerate(zip(derv, self.ele_banks)):
-            if self.ele_types[i] != 'quad': continue
+            if not (self.ele_types[i] == 'quad' or
+                    self.ele_types[i] == 'hex'):
+                continue
             s1, s2 = elemat.shape[0], elemat.shape[1]
 
             for i_elem in range(elemat.shape[2]):

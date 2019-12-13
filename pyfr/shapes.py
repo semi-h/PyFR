@@ -170,9 +170,15 @@ class BaseShape(object):
     def m39(self):
         m = self.gbasis_at(self.upts)
         i, j = m.shape
-        step = j//4
-        m[:, :step] = 0
-        m[:, 2*step:3*step] = 0
+        nf = len(self.nfacefpts)
+        step = j//nf
+        if nf == 4:
+            m[:, :step] = 0
+            m[:, 2*step:3*step] = 0
+        elif nf == 6:
+            m[:, :2*step] = 0
+            m[:, 3*step:4*step] = 0
+            m[:, 5*step:6*step] = 0
         return m
 
     @lazyprop
