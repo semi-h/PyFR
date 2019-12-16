@@ -213,7 +213,7 @@ def process_color(args):
         rlist = list()
         ccrlist = list()
         ndim = mesh[elemtype].shape[2]
-        o = int(np.power(mesh[elemtype].shape[0], 1/ndim)) - 1
+        o = int(round(np.power(mesh[elemtype].shape[0], 1/ndim))) - 1
         refelem = np.zeros(((o+1)**ndim, ndim))
 
         def dist(n, m):
