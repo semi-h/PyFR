@@ -47,6 +47,15 @@ class BaseAdvectionDiffusionElements(BaseAdvectionElements):
              rcpdjac=self.rcpdjac_at('upts'), gradu=self._vect_upts
         )
 
+        self.kernels['tgradpcoru_upts_xi'] = lambda: backend.kernel(
+            'mul', self.opmat('M49 - M69*M0'), self.scal_upts_inb,
+            out=self._vect_upts
+        )
+        self.kernels['tgradcoru_upts_xi'] = lambda: backend.kernel(
+            'mul', self.opmat('M69'), self._vect_fpts.rslice(0, self.nfpts),
+             out=self._vect_upts, beta=1.0
+        )
+
         def gradcoru_fpts():
             nupts, nfpts = self.nupts, self.nfpts
             vupts, vfpts = self._vect_upts, self._vect_fpts

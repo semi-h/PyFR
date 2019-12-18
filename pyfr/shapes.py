@@ -182,6 +182,16 @@ class BaseShape(object):
         return m
 
     @lazyprop
+    def m49(self):
+        m = self.m19.reshape(self.nupts, -1, self.nupts).swapaxes(0, 1)
+        return m.reshape(-1, self.nupts)
+
+    @lazyprop
+    def m69(self):
+        m = self.norm_fpts.T[:,None,:]*self.m39
+        return m.reshape(-1, self.nfpts)
+
+    @lazyprop
     def nupts(self):
         n = self.order + 1
         return np.polyval(self.npts_coeffs, n) // self.npts_cdenom

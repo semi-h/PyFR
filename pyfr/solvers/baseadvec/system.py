@@ -6,7 +6,7 @@ from pyfr.solvers.base import BaseSystem
 class BaseAdvectionSystem(BaseSystem):
     _nqueues = 2
 
-    def rhs(self, t, uinbank, foutbank):
+    def rhs(self, t, uinbank, foutbank, xi=False):
         runall = self.backend.runall
         q1, q2 = self._queues
         kernels = self._kernels
@@ -21,7 +21,10 @@ class BaseAdvectionSystem(BaseSystem):
         if ('eles', 'copy_soln') in kernels:
             q1 << kernels['eles', 'copy_soln']()
         q1 << kernels['eles', 'tdisf']()
-        q1 << kernels['eles', 'tdivtpcorf']()
+        if not xi:
+            q1 << kernels['eles', 'tdivtpcorf']()
+        else:
+            q1 << kernels['eles', 'tdivtpcorf_xi']()
         q1 << kernels['iint', 'comm_flux']()
         q1 << kernels['bcint', 'comm_flux'](t=t)
 
@@ -32,7 +35,10 @@ class BaseAdvectionSystem(BaseSystem):
         runall([q1, q2])
 
         q1 << kernels['mpiint', 'comm_flux']()
-        q1 << kernels['eles', 'tdivtconf']()
+        if not xi:
+            q1 << kernels['eles', 'tdivtconf']()
+        else:
+            q1 << kernels['eles', 'tdivtconf_xi']()
         if ('eles', 'tdivf_qpts') in kernels:
             q1 << kernels['eles', 'tdivf_qpts']()
             q1 << kernels['eles', 'negdivconf'](t=t)

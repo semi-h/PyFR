@@ -25,7 +25,10 @@ class BaseAdvectionDiffusionSystem(BaseAdvectionSystem):
         if ('eles', 'shocksensor') in kernels:
             q1 << kernels['eles', 'shocksensor']()
             q1 << kernels['mpiint', 'artvisc_fpts_pack']()
-        q1 << kernels['eles', 'tgradpcoru_upts']()
+        if not xi:
+            q1 << kernels['eles', 'tgradpcoru_upts']()
+        else:
+            q1 << kernels['eles', 'tgradpcoru_upts_xi']()
         q2 << kernels['mpiint', 'scal_fpts_send']()
         q2 << kernels['mpiint', 'scal_fpts_recv']()
         q2 << kernels['mpiint', 'scal_fpts_unpack']()
@@ -33,7 +36,10 @@ class BaseAdvectionDiffusionSystem(BaseAdvectionSystem):
         runall([q1, q2])
 
         q1 << kernels['mpiint', 'con_u']()
-        q1 << kernels['eles', 'tgradcoru_upts']()
+        if not xi:
+            q1 << kernels['eles', 'tgradcoru_upts']()
+        else:
+            q1 << kernels['eles', 'tgradcoru_upts_xi']()
         q1 << kernels['eles', 'gradcoru_upts']()
         q1 << kernels['eles', 'gradcoru_fpts']()
         q1 << kernels['mpiint', 'vect_fpts_pack']()
