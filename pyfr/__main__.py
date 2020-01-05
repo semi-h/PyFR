@@ -271,16 +271,19 @@ def process_color(args):
                 for e in newm[dataset][...].flat:
                     arr = e.astype('U4,i4,i1,i1')
                     if arr[0] == 'quad':
-                        if arr[1] in rlist:
+                        idx = np.searchsorted(rlist, arr[1])
+                        if idx < len(rlist) and rlist[idx] == arr[1]:
                             e[2] = (e[2]-1) % 4
                             continue
 
                     if arr[0] == 'hex':
-                        if arr[1] in rlist:
+                        idx = np.searchsorted(rlist, arr[1])
+                        if idx < len(rlist) and rlist[idx] == arr[1]:
                             e[2] = rotface[e[2]]
                             continue
 
-                        if arr[1] in ccrlist:
+                        idx = np.searchsorted(ccrlist, arr[1])
+                        if idx < len(ccrlist) and ccrlist[idx] == arr[1]:
                             e[2] = rotccface[e[2]]
                             continue
 
