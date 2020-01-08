@@ -228,6 +228,10 @@ class BaseSystem(object, metaclass=ABCMeta):
             if size > maxsize:
                 maxsize = size
 
+        from pyfr.mpiutil import get_comm_rank_root, get_mpi
+        comm, rank, root = get_comm_rank_root()
+        maxsize = comm.allreduce(maxsize, op=get_mpi('max'))
+
         for color in self.clrmap:
             for ncol in range(maxsize):
                 for i, (base_elemat, eb) in enumerate(zip(base_soln,
