@@ -44,6 +44,8 @@ class BaseSystem(object):
         self.ele_types = list(elemap)
         self.ele_ndofs = [e.neles*e.nupts*e.nvars for e in eles]
         self.ele_shapes = [(e.nupts, e.nvars, e.neles) for e in eles]
+        self.ele_pmats = [e.pmat for e in eles]
+        self.ele_ncp = [e.ncp for e in eles]
 
         # Get all the solution point locations for the elements
         self.ele_ploc_upts = [e.ploc_at_np('upts') for e in eles]
@@ -301,6 +303,30 @@ class BaseSystem(object):
                 self.jacob[i][i_elem] *= adiag
                 self.jacob[i][i_elem] += np.identity(size)/dtmarch
                 self.jacob[i][i_elem] = np.linalg.inv(self.jacob[i][i_elem])
+
+        for i, pmat in enumerate(self.ele_pmats):
+            if pmat:
+                ncp = self.ele_ncp[i]
+                lsz = ncp*self.nvars
+
+                # Allocate an empty array; ncp*nvars, nupts, nvars, neles
+                nppmat = np.zeros((ncp*self.nvars, self.ele_shapes[i][0],
+                                   self.nvars, self.ele_shapes[i][2]))
+
+                nlines = int(self.ele_shapes[i][0]/ncp)
+
+                for i_elem in range(self.ele_shapes[i][2]):
+                    for line in range(nlines):
+                        for i_ncp in range(ncp):
+                            for i_nvar in range(self.nvars):
+                                col = i_ncp*self.nvars+i_nvar
+                                nppmat[
+                                    col, line*ncp:(line+1)*ncp, :, i_elem
+                                ] = self.jacob[i][i_elem][
+                                        line*lsz+col, line*lsz:(line+1)*lsz
+                                    ].reshape(-1, self.nvars)
+
+                pmat.set(nppmat)
 
     def restore_soln(self, u, soln):
         for elemat, eb in zip(soln, self.ele_banks):

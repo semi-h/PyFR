@@ -141,6 +141,11 @@ class BaseElements(object):
             raise ValueError('Invalid slice side')
 
     @lazyprop
+    def _lineimp(self):
+        return self.cfg.getbool('solver-time-integrator', 'pseudo-lineimp',
+                                False)
+
+    @lazyprop
     def _src_exprs(self):
         convars = self.convarmap[self.ndims]
 

@@ -53,7 +53,7 @@ class BaseAdvectionDiffusionElements(BaseAdvectionElements):
                 slicem(self._vect_fpts, s, 0, self.nfpts),
                 out=slicem(self._vect_upts, s), beta=1.0
             )
-            kernels['tgradcoru_upts_xi' + s] = lambda s=s: kernel(
+            kernels['tgradcoru_upts_xi_' + s] = lambda s=s: kernel(
                 'mul', self.opmat('M69'),
                 slicem(self._vect_fpts, s, 0, self.nfpts),
                 out=slicem(self._vect_upts, s), beta=1.0

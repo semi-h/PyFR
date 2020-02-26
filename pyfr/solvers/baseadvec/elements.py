@@ -22,6 +22,25 @@ class BaseAdvectionElements(BaseElements):
 
         return bufs
 
+    def preconditioner(self):
+        self.ncp = self.basis.order+1
+        self.nlines = self.nupts // self.ncp
+        self.pmat = self._be.matrix((self.ncp*self.nvars, self.nupts,
+                                     self.nvars, self.neles), tags={'align'})
+
+        tplargs = dict(ndims=self.ndims, nvars=self.nvars, nlines=self.nlines,
+                       ncp=self.ncp)
+
+        self._be.pointwise.register(
+            'pyfr.solvers.baseadvec.kernels.pcond'
+        )
+
+        self.kernels['pcond'] = lambda: self._be.kernel(
+            'pcond', tplargs=tplargs,
+            dims=[self.nlines, self.neles], pmat=self.pmat,
+            rhs=self.scal_upts_outb
+        )
+
     def set_backend(self, *args, **kwargs):
         super().set_backend(*args, **kwargs)
 
@@ -130,6 +149,13 @@ class BaseAdvectionElements(BaseElements):
                 dims=[self.nupts, self.neles], tdivtconf=self.scal_upts_outb,
                 rcpdjac=self.rcpdjac_at('upts'), ploc=plocupts, u=solnupts
             )
+
+        if self._lineimp and (self.basis.name == 'quad' or
+                              self.basis.name == 'hex'):
+            self.preconditioner()
+        else:
+            self.pmat = None
+            self.ncp = None
 
         # In-place solution filter
         if self.cfg.getint('soln-filter', 'nsteps', '0'):

@@ -11,10 +11,10 @@ class Arg(object):
     def __init__(self, name, spec, body):
         self.name = name
 
-        specptn = (r'(?:(in|inout|out)\s+)?'                # Intent
-                   r'(?:(broadcast|mpi|scalar|view)\s+)?'   # Attrs
-                   r'([A-Za-z_]\w*)'                        # Data type
-                   r'((?:\[\d+\]){0,2})$')                  # Dimensions
+        specptn = (r'(?:(in|inout|out)\s+)?'                         # Intent
+                   r'(?:(broadcast|mpi|scalar|view|customrow)\s+)?'  # Attrs
+                   r'([A-Za-z_]\w*)'                                 # Type
+                   r'((?:\[\d+\]){0,2})$')                           # Dims
         dimsptn = r'(?<=\[)\d+(?=\])'
         usedptn = r'(?:[^A-Za-z]|^){0}[^A-Za-z0-9]'.format(name)
 
@@ -41,6 +41,7 @@ class Arg(object):
         self.isview = 'view' in self.attrs
         self.isscalar = 'scalar' in self.attrs
         self.isvector = 'scalar' not in self.attrs
+        self.iscustomrow = 'customrow' in self.attrs
 
         # Validation
         if self.isbroadcast and self.intent != 'in':
@@ -173,6 +174,11 @@ class BaseKernelGenerator(object):
         elif arg.ncdim == 1:
             ix = (r'ld{0}*_y + X_IDX_AOSOA(\1, {1})'
                    .format(arg.name, arg.cdims[0]))
+        # Doubly stacked matrix with custom row access
+        #   name[\1][\2] => name_v[ldim*(\1) + X_IDX_AOSOA(\2, nv)]
+        elif arg.iscustomrow and arg.ncdim == 2:
+            ix = (r'(\1)*ld{0} + X_IDX_AOSOA(\2, {1})'
+                   .format(arg.name, arg.cdims[1]))
         # Doubly stacked matrix:
         #   name[\1][\2] => name_v[((\1)*ny + _y)*ldim + X_IDX_AOSOA(\2, nv)]
         else:

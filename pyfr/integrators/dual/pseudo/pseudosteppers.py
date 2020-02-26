@@ -47,9 +47,13 @@ class BaseDualPseudoStepper(BaseDualPseudoIntegrator):
         self._queue % axnpby(1, *svals)
 
         # Multiply fout by the preconditioner
-        # then divide by dtau to make all steppers compatible
-        if self.pseudoimp:
-            self.system.precondition(fout, self._dtau)
+        # kernel divides result by dtau to make all steppers compatible
+        if ('eles', 'pcond') in self.system._kernels:
+            self.system.eles_scal_upts_outb.active = fout
+            self._queue % self.system._kernels['eles', 'pcond'](dtmarch
+                                                                =self._dtau)
+        #if self.pseudoimp:
+        #    self.system.precondition(fout, self._dtau)
 
 
 class DualEulerPseudoStepper(BaseDualPseudoStepper):
