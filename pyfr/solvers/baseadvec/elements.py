@@ -53,41 +53,41 @@ class BaseAdvectionElements(BaseElements):
             if fluxaa or (divfluxaa and solnsrc):
                 kernels['disu_' + s] = lambda s=s: self._be.kernel(
                     'mul', self.opmat('M8'), slicem(self.scal_upts_inb, s),
-                    out=slicem(self._scal_fqpts, s)
+                    out=slicem(self._scal_fqpts, s), nmex='disu_'+s
                 )
             else:
                 kernels['disu_' + s] = lambda s=s: self._be.kernel(
                     'mul', self.opmat('M0'), slicem(self.scal_upts_inb, s),
-                    out=slicem(self._scal_fpts, s)
+                    out=slicem(self._scal_fpts, s), nmex='disu_'+s
                 )
 
         # Interpolations and projections to/from quadrature points
         if divfluxaa:
             kernels['tdivf_qpts'] = lambda: self._be.kernel(
                 'mul', self.opmat('M7'), self.scal_upts_outb,
-                out=self._scal_qpts
+                out=self._scal_qpts, nmex='tdivf_qpts'
             )
             kernels['divf_upts'] = lambda: self._be.kernel(
                 'mul', self.opmat('M9'), self._scal_qpts,
-                out=self.scal_upts_outb
+                out=self.scal_upts_outb, nmex='divf_upts'
             )
 
         # First flux correction kernel
         if fluxaa:
             kernels['tdivtpcorf'] = lambda: self._be.kernel(
                 'mul', self.opmat('(M1 - M3*M2)*M10'), self._vect_qpts,
-                out=self.scal_upts_outb
+                out=self.scal_upts_outb, nmex='tdivtpcorf'
             )
         else:
             kernels['tdivtpcorf'] = lambda: self._be.kernel(
                 'mul', self.opmat('M1 - M3*M2'), self._vect_upts,
-                out=self.scal_upts_outb
+                out=self.scal_upts_outb, nmex='tdivtpcorf'
             )
 
         # Second flux correction kernel
         kernels['tdivtconf'] = lambda: self._be.kernel(
             'mul', self.opmat('M3'), self._scal_fpts, out=self.scal_upts_outb,
-            beta=1.0
+            beta=1.0, nmex='tdivtconf'
         )
 
         # Transformed to physical divergence kernel + source term
@@ -125,7 +125,7 @@ class BaseAdvectionElements(BaseElements):
             def filter_soln():
                 mul = self._be.kernel(
                     'mul', self.opmat('M11'), self.scal_upts_inb,
-                    out=self._scal_upts_temp
+                    out=self._scal_upts_temp, nmex='filter_soln'
                 )
                 copy = self._be.kernel(
                     'copy', self.scal_upts_inb, self._scal_upts_temp

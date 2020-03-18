@@ -71,5 +71,6 @@ class EulerElements(BaseFluidElements, BaseAdvectionElements):
             self.kernels['tdisf'] = lambda: self._be.kernel(
                 'tflux', tplargs=tplargs, dims=[self.nupts, self.neles],
                 u=self.scal_upts_inb, smats=self.smat_at('upts'),
-                f=self._vect_upts
+                f=self._vect_upts, uout=self.scal_upts_outb,
+                func1=self.kernels['tdivtpcorf']().func_ptr
             )

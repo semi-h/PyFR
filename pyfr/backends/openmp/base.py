@@ -13,12 +13,14 @@ class OpenMPBackend(BaseBackend):
 
         # Take the default alignment requirement to be 32-bytes
         self.alignb = cfg.getint('backend-openmp', 'alignb', 32)
+        self.L2cache = cfg.getint('backend-openmp', 'L2cache', 256)
 
         if self.alignb < 32 or (self.alignb & (self.alignb - 1)):
             raise ValueError('Alignment must be a power of 2 and >= 32')
 
         # Compute the SoA size
         self.soasz = self.alignb // np.dtype(self.fpdtype).itemsize
+        self.aosoasz = self.L2cache*1024//self.alignb//4//4*5
 
         from pyfr.backends.openmp import (blasext, cblas, gimmik, packing,
                                           provider, types, xsmm)

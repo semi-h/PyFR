@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from gimmik import generate_mm
+from ctypes import cast, c_void_p
 import numpy as np
 
 from pyfr.backends.base import ComputeKernel, NotSuitableError
@@ -14,7 +15,7 @@ class OpenMPGiMMiKKernels(OpenMPKernelProvider):
         self.max_nnz = backend.cfg.getint('backend-openmp', 'gimmik-max-nnz',
                                           512)
 
-    def mul(self, a, b, out, alpha=1.0, beta=0.0):
+    def mul(self, a, b, out, alpha=1.0, beta=0.0, nmex=None):
         # Ensure the matrices are compatible
         if a.nrow != out.nrow or a.ncol != b.nrow or b.ncol != out.ncol:
             raise ValueError('Incompatible matrices for out = a*b')
@@ -30,10 +31,16 @@ class OpenMPGiMMiKKernels(OpenMPKernelProvider):
         # Generate the GiMMiK kernel
         src = generate_mm(a.get(), dtype=a.dtype, platform='c-omp',
                           alpha=alpha, beta=beta)
-        gimmik_mm = self._build_kernel('gimmik_mm', src,
+
+        name = 'gimmik_mm_' + (nmex if nmex else '')
+
+        gimmik_mm = self._build_kernel(name, src.replace('gimmik_mm', name),
                                        [np.int32] + [np.intp, np.int32]*2)
+        print(name, gimmik_mm)
 
         class MulKernel(ComputeKernel):
+            func_ptr = cast(gimmik_mm, c_void_p).value
+
             def run(self, queue):
                 gimmik_mm(b.ncol, b, b.leaddim, out, out.leaddim)
 

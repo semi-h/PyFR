@@ -52,8 +52,8 @@ class BaseAdvectionDiffusionSystem(BaseAdvectionSystem):
         q1 << kernels['eles', 'gradcoru_fpts_int']()
         if ('eles', 'gradcoru_qpts') in kernels:
             q1 << kernels['eles', 'gradcoru_qpts']()
-        q1 << kernels['eles', 'tdisf']()
-        q1 << kernels['eles', 'tdivtpcorf']()
+        #q1 << kernels['eles', 'tdisf']()
+        #q1 << kernels['eles', 'tdivtpcorf']()
         q1 << kernels['iint', 'comm_flux']()
         q1 << kernels['bcint', 'comm_flux'](t=t)
 
@@ -64,11 +64,12 @@ class BaseAdvectionDiffusionSystem(BaseAdvectionSystem):
         runall([q1, q2])
 
         q1 << kernels['mpiint', 'comm_flux']()
-        q1 << kernels['eles', 'tdivtconf']()
-        if ('eles', 'tdivf_qpts') in kernels:
-            q1 << kernels['eles', 'tdivf_qpts']()
-            q1 << kernels['eles', 'negdivconf'](t=t)
-            q1 << kernels['eles', 'divf_upts']()
-        else:
-            q1 << kernels['eles', 'negdivconf'](t=t)
+        q1 << kernels['eles', 'tdisf']()
+        #q1 << kernels['eles', 'tdivtconf']()
+        #if ('eles', 'tdivf_qpts') in kernels:
+        #    q1 << kernels['eles', 'tdivf_qpts']()
+        #    q1 << kernels['eles', 'negdivconf'](t=t)
+        #    q1 << kernels['eles', 'divf_upts']()
+        #else:
+        #    q1 << kernels['eles', 'negdivconf'](t=t)
         runall([q1])

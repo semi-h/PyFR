@@ -31,5 +31,7 @@ class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
             self.kernels['tdisf'] = lambda: self._be.kernel(
                 'tflux', tplargs=tplargs, dims=[self.nupts, self.neles],
                 u=self.scal_upts_inb, smats=self.smat_at('upts'),
-                f=self._vect_upts, artvisc=self.artvisc
+                f=self._vect_upts, artvisc=self.artvisc,
+                uout=self.scal_upts_outb,
+                func=self.kernels['tdivtpcorf']().func_ptr
             )

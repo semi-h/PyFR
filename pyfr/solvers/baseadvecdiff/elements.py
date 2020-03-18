@@ -39,14 +39,15 @@ class BaseAdvectionDiffusionElements(BaseAdvectionElements):
         )
         kernels['tgradpcoru_upts'] = lambda: kernel(
             'mul', self.opmat('M4 - M6*M0'), self.scal_upts_inb,
-            out=self._vect_upts
+            out=self._vect_upts, nmex='tgradpcoru_upts'
         )
 
         for s, neles in self._ext_int_sides:
             kernels['tgradcoru_upts_' + s] = lambda s=s: kernel(
                 'mul', self.opmat('M6'),
                 slicem(self._vect_fpts, s, 0, self.nfpts),
-                out=slicem(self._vect_upts, s), beta=1.0
+                out=slicem(self._vect_upts, s), beta=1.0,
+                nmex='tgradcoru_upts_'+s
             )
             kernels['gradcoru_upts_' + s] = lambda s=s, neles=neles: kernel(
                 'gradcoru', tplargs=dict(ndims=self.ndims, nvars=self.nvars),
@@ -63,7 +64,8 @@ class BaseAdvectionDiffusionElements(BaseAdvectionElements):
                 # Exploit the block-diagonal form of the operator
                 muls = [kernel('mul', self.opmat('M0'),
                                slicem(vupts, s, i*nupts, (i + 1)*nupts),
-                               slicem(vfpts, s, i*nfpts, (i + 1)*nfpts))
+                               slicem(vfpts, s, i*nfpts, (i + 1)*nfpts),
+                               nmex='gradcoru_fpts')
                         for i in range(self.ndims)]
 
                 return ComputeMetaKernel(muls)
@@ -78,7 +80,8 @@ class BaseAdvectionDiffusionElements(BaseAdvectionElements):
                 # Exploit the block-diagonal form of the operator
                 muls = [self._be.kernel('mul', self.opmat('M7'),
                                         vupts.slice(i*nupts, (i + 1)*nupts),
-                                        vqpts.slice(i*nqpts, (i + 1)*nqpts))
+                                        vqpts.slice(i*nqpts, (i + 1)*nqpts),
+                                        nmex='gradcoru_qpts')
                         for i in range(self.ndims)]
 
                 return ComputeMetaKernel(muls)
