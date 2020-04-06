@@ -97,7 +97,7 @@ class DualEulerPseudoStepper(BaseDualPseudoStepper):
             alpha = res.x
 
             add(0, r1, 1, r0, alpha[0]*self._dtau, r1)
-        
+
         return r1, r0
 
     def objective_func(self, alpha):

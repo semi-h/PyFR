@@ -10,6 +10,10 @@ from pyfr.util import memoize
 class OpenMPKernelProvider(BaseKernelProvider):
     @memoize
     def _build_kernel(self, name, src, argtypes, restype=None):
+        print(name)
+        if name=='pcond':
+            f = open('pcond.cpp', 'w')
+            f.write(src)
         mod = SourceModule(src, self.backend.cfg)
         return mod.function(name, restype, argtypes)
 

@@ -223,6 +223,7 @@ class BaseSystem(object):
         # perturb and call rhs to construct to element jacobians
         # invert element jacobian in place
         import numpy as np
+        import scipy.linalg
 
         eps = 1e-8
 
@@ -302,7 +303,13 @@ class BaseSystem(object):
             for i_elem in range(base_elemat.shape[2]):
                 self.jacob[i][i_elem] *= adiag
                 self.jacob[i][i_elem] += np.identity(size)/dtmarch
-                self.jacob[i][i_elem] = np.linalg.inv(self.jacob[i][i_elem])
+                #self.jacob[i][i_elem] = np.linalg.inv(self.jacob[i][i_elem])
+                #p, l, u = scipy.linalg.lu(self.jacob[i][i_elem])
+                #print(p)
+                #if not np.isclose(p, np.identity(size)).all():
+                #    print('aaaa\n')
+                #self.jacob[i][i_elem] = l + u - np.identity(size)
+                self.LUdecomp(self.jacob[i][i_elem])
 
         for i, pmat in enumerate(self.ele_pmats):
             if pmat:
@@ -347,6 +354,16 @@ class BaseSystem(object):
                 elemat[:, :, i_elem] = solnary.reshape((s1, s2))
 
             eb[r].set(elemat)
+
+    def LUdecomp(self, a):
+        n = len(a)
+        for k in range(0,n-1):
+            for i in range(k+1,n):
+                if a[i,k] != 0.0:
+                    lam = a [i,k]/a[k,k]
+                    a[i,k+1:n] = a[i,k+1:n] - lam*a[k,k+1:n]
+                    a[i,k] = lam
+        return a
 
     def filt(self, uinoutbank):
         self.eles_scal_upts_inb.active = uinoutbank
