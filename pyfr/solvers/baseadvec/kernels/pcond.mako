@@ -5,12 +5,14 @@
 <%pyfr:kernel name='pcond' ndim='2'
               dtmarch='scalar fpdtype_t'
               rhs='inout customrow fpdtype_t[1][${str(nvars)}]'
-              pmat='in customrow fpdtype_t[${str(ncp*nvars)}][${str(nvars)}]'>
+              pmat='in customrow fpdtype_t[${str(ncp*nvars)}][${str(nvars)}]'
+              piv='in customrow fpdtype_t[${str(ncp*nlines)}][1]'>
 
 // _y goes up to nlines, loop over ncp for each line
 
     fpdtype_t rhst[${ncp*nvars}], rhsx[${ncp*nvars}];
     fpdtype_t alpha, div;
+    int pi, i, j;
 
 // forward substitution
 % for i in range(ncp*nvars):
@@ -21,7 +23,10 @@
                 i=i//ncp, j=i%ncp, ix=ix)
         for ix in range(i)]
     )};
-    rhst[${i}] = rhs[${ncp}*_y+${i//ncp}][${i%ncp}] - alpha;
+    pi = piv[${i}+_y*${ncp*nvars}][0];
+    i = (pi%${ncp*nvars})/${ncp};
+    j = (pi%${ncp*nvars})%${ncp};
+    rhst[${i}] = rhs[${ncp}*_y+i][j] - alpha;
 
 
 % endfor

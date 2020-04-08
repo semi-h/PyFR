@@ -45,6 +45,7 @@ class BaseSystem(object):
         self.ele_ndofs = [e.neles*e.nupts*e.nvars for e in eles]
         self.ele_shapes = [(e.nupts, e.nvars, e.neles) for e in eles]
         self.ele_pmats = [e.pmat for e in eles]
+        self.ele_pivs = [e.piv for e in eles]
         self.ele_ncp = [e.ncp for e in eles]
 
         # Get all the solution point locations for the elements
@@ -235,6 +236,7 @@ class BaseSystem(object):
         self.restore_soln(u, base_soln)
 
         self.jacob = list()
+        self.piv = list()
         maxsize = 0
 
         for i, base_elemat in enumerate(base_soln):
@@ -242,10 +244,12 @@ class BaseSystem(object):
                     self.ele_types[i] == 'hex'):
                 continue
             self.jacob.append(list())
+            self.piv.append(list())
             size = base_elemat.shape[0]*base_elemat.shape[1]
 
             for j in range(base_elemat.shape[2]):
                 self.jacob[i].append(np.zeros((size, size)))
+                self.piv[i].append(np.zeros(size))
 
             if size > maxsize:
                 maxsize = size
@@ -303,15 +307,20 @@ class BaseSystem(object):
             for i_elem in range(base_elemat.shape[2]):
                 self.jacob[i][i_elem] *= adiag
                 self.jacob[i][i_elem] += np.identity(size)/dtmarch
+                # invert
                 #self.jacob[i][i_elem] = np.linalg.inv(self.jacob[i][i_elem])
-                #p, l, u = scipy.linalg.lu(self.jacob[i][i_elem])
-                #print(p)
-                #if not np.isclose(p, np.identity(size)).all():
-                #    print('aaaa\n')
-                #self.jacob[i][i_elem] = l + u - np.identity(size)
-                self.LUdecomp(self.jacob[i][i_elem])
+                # lu with pivoting
+                p, l, u = scipy.linalg.lu(self.jacob[i][i_elem])
+                self.jacob[i][i_elem] = l + u - np.identity(size)
+                _, self.piv[i][i_elem] = np.where(p.T == 1)
+                # lu with no pivoting
+                #self.LUdecomp(self.jacob[i][i_elem])
+                # compact lu outputs lapack ipiv
+                #_lu, _piv = scipy.linalg.lu_factor(self.jacob[i][i_elem])
+                #self.jacob[i][i_elem] = _lu
+                #self.piv[i][i_elem] = _piv
 
-        for i, pmat in enumerate(self.ele_pmats):
+        for i, (pmat, piv) in enumerate(zip(self.ele_pmats, self.ele_pivs)):
             if pmat:
                 ncp = self.ele_ncp[i]
                 lsz = ncp*self.nvars
@@ -319,10 +328,13 @@ class BaseSystem(object):
                 # Allocate an empty array; ncp*nvars, nupts, nvars, neles
                 nppmat = np.zeros((ncp*self.nvars, self.ele_shapes[i][0],
                                    self.nvars, self.ele_shapes[i][2]))
+                nppiv = np.zeros((self.ele_shapes[i][0]*self.nvars,
+                                  self.ele_shapes[i][2]))
 
                 nlines = int(self.ele_shapes[i][0]/ncp)
 
                 for i_elem in range(self.ele_shapes[i][2]):
+                    nppiv[:, i_elem] = self.piv[i][i_elem][:]
                     for line in range(nlines):
                         for i_ncp in range(ncp):
                             for i_nvar in range(self.nvars):
@@ -334,6 +346,7 @@ class BaseSystem(object):
                                     ].reshape(-1, self.nvars)
 
                 pmat.set(nppmat)
+                piv.set(nppiv)
 
     def restore_soln(self, u, soln):
         for elemat, eb in zip(soln, self.ele_banks):

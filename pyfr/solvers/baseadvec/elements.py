@@ -27,6 +27,7 @@ class BaseAdvectionElements(BaseElements):
         self.nlines = self.nupts // self.ncp
         self.pmat = self._be.matrix((self.ncp*self.nvars, self.nupts,
                                      self.nvars, self.neles), tags={'align'})
+        self.piv = self._be.matrix((self.nupts*self.nvars, self.neles))
 
         tplargs = dict(ndims=self.ndims, nvars=self.nvars, nlines=self.nlines,
                        ncp=self.ncp)
@@ -38,7 +39,7 @@ class BaseAdvectionElements(BaseElements):
         self.kernels['pcond'] = lambda: self._be.kernel(
             'pcond', tplargs=tplargs,
             dims=[self.nlines, self.neles], pmat=self.pmat,
-            rhs=self.scal_upts_outb
+            rhs=self.scal_upts_outb, piv=self.piv
         )
 
     def set_backend(self, *args, **kwargs):
@@ -155,6 +156,7 @@ class BaseAdvectionElements(BaseElements):
             self.preconditioner()
         else:
             self.pmat = None
+            self.piv = None
             self.ncp = None
 
         # In-place solution filter
