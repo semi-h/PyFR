@@ -235,21 +235,19 @@ class BaseSystem(object):
 
         self.restore_soln(u, base_soln)
 
-        self.jacob = list()
-        self.piv = list()
+        self.jacob = dict()
+        self.piv = dict()
         maxsize = 0
 
         for i, base_elemat in enumerate(base_soln):
-            if not (self.ele_types[i] == 'quad' or
-                    self.ele_types[i] == 'hex'):
+            et = self.ele_types[i]
+            if not (et == 'quad' or et == 'hex'):
                 continue
-            self.jacob.append(list())
-            self.piv.append(list())
-            size = base_elemat.shape[0]*base_elemat.shape[1]
 
-            for j in range(base_elemat.shape[2]):
-                self.jacob[i].append(np.zeros((size, size)))
-                self.piv[i].append(np.zeros(size))
+            size = base_elemat.shape[0]*base_elemat.shape[1]
+            n_ele = base_elemat.shape[2]
+            self.jacob[et] = np.zeros((n_ele, size, size), dtype=np.double)
+            self.piv[et] = np.zeros((n_ele, size), dtype=np.int)
 
             if size > maxsize:
                 maxsize = size
@@ -262,8 +260,8 @@ class BaseSystem(object):
             for ncol in range(maxsize):
                 for i, (base_elemat, eb) in enumerate(zip(base_soln,
                                                           self.ele_banks)):
-                    if not (self.ele_types[i] == 'quad' or
-                            self.ele_types[i] == 'hex'):
+                    et = self.ele_types[i]
+                    if not (et == 'quad' or et == 'hex'):
                         continue
                     size = base_elemat.shape[0]*base_elemat.shape[1]
 
@@ -285,8 +283,8 @@ class BaseSystem(object):
                 self.restore_soln(u, base_soln)
 
                 for i, base_elemat in enumerate(base_soln):
-                    if not (self.ele_types[i] == 'quad' or
-                            self.ele_types[i] == 'hex'):
+                    et = self.ele_types[i]
+                    if not (et == 'quad' or et == 'hex'):
                         continue
                     size = base_elemat.shape[0]*base_elemat.shape[1]
 
@@ -296,23 +294,23 @@ class BaseSystem(object):
                     for i_elem in self.clrmap[color][self.ele_types[i]]:
                         diff = -(pert_derv[i][:, :, i_elem]
                                  - base_derv[i][:, :, i_elem])/eps
-                        self.jacob[i][i_elem][:, ncol] = diff.reshape(-1)
+                        self.jacob[et][i_elem, :, ncol] = diff.reshape(-1)
 
         for i, base_elemat in enumerate(base_soln):
-            if not (self.ele_types[i] == 'quad' or
-                    self.ele_types[i] == 'hex'):
+            et = self.ele_types[i]
+            if not (et == 'quad' or et == 'hex'):
                 continue
             size = base_elemat.shape[0]*base_elemat.shape[1]
 
             for i_elem in range(base_elemat.shape[2]):
-                self.jacob[i][i_elem] *= adiag
-                self.jacob[i][i_elem] += np.identity(size)/dtmarch
+                self.jacob[et][i_elem, ...] *= adiag
+                self.jacob[et][i_elem, ...] += np.identity(size)/dtmarch
                 # invert
                 #self.jacob[i][i_elem] = np.linalg.inv(self.jacob[i][i_elem])
                 # lu with pivoting
-                p, l, u = scipy.linalg.lu(self.jacob[i][i_elem])
-                self.jacob[i][i_elem] = l + u - np.identity(size)
-                _, self.piv[i][i_elem] = np.where(p.T == 1)
+                p, l, u = scipy.linalg.lu(self.jacob[et][i_elem, ...])
+                self.jacob[et][i_elem, ...] = l + u - np.identity(size)
+                _, self.piv[et][i_elem, ...] = np.where(p.T == 1)
                 # lu with no pivoting
                 #self.LUdecomp(self.jacob[i][i_elem])
                 # compact lu outputs lapack ipiv
@@ -321,6 +319,7 @@ class BaseSystem(object):
                 #self.piv[i][i_elem] = _piv
 
         for i, (pmat, piv) in enumerate(zip(self.ele_pmats, self.ele_pivs)):
+            et = self.ele_types[i]
             if pmat:
                 ncp = self.ele_ncp[i]
                 lsz = ncp*self.nvars
@@ -334,15 +333,16 @@ class BaseSystem(object):
                 nlines = int(self.ele_shapes[i][0]/ncp)
 
                 for i_elem in range(self.ele_shapes[i][2]):
-                    nppiv[:, i_elem] = self.piv[i][i_elem][:]
+                    nppiv[:, i_elem] = self.piv[et][i_elem, ...]
                     for line in range(nlines):
                         for i_ncp in range(ncp):
                             for i_nvar in range(self.nvars):
                                 col = i_ncp*self.nvars+i_nvar
                                 nppmat[
                                     col, line*ncp:(line+1)*ncp, :, i_elem
-                                ] = self.jacob[i][i_elem][
-                                        line*lsz+col, line*lsz:(line+1)*lsz
+                                ] = self.jacob[et][
+                                        i_elem, line*lsz+col,
+                                        line*lsz:(line+1)*lsz
                                     ].reshape(-1, self.nvars)
 
                 pmat.set(nppmat)
@@ -356,14 +356,14 @@ class BaseSystem(object):
         derv = self.ele_scal_upts(r)
 
         for i, (elemat, eb) in enumerate(zip(derv, self.ele_banks)):
-            if not (self.ele_types[i] == 'quad' or
-                    self.ele_types[i] == 'hex'):
+            et = self.ele_types[i]
+            if not (et == 'quad' or et == 'hex'):
                 continue
             s1, s2 = elemat.shape[0], elemat.shape[1]
 
             for i_elem in range(elemat.shape[2]):
                 solnary = elemat[:, :, i_elem].reshape(-1)
-                solnary = self.jacob[i][i_elem].dot(solnary)/dtmarch
+                solnary = self.jacob[et][i_elem, ...].dot(solnary)/dtmarch
                 elemat[:, :, i_elem] = solnary.reshape((s1, s2))
 
             eb[r].set(elemat)
