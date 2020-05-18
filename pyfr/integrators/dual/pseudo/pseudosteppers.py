@@ -92,9 +92,10 @@ class DualEulerPseudoStepper(BaseDualPseudoStepper):
             from skopt import dummy_minimize, gp_minimize
 
             alpha = 1.0
-            res = dummy_minimize(self.objective_func, [(0.0, 1.4)], n_calls=11,
+            res = dummy_minimize(self.objective_func, [(0.0, 1.0)], n_calls=100,
                               random_state=123, verbose=False, x0=[alpha])
             alpha = res.x
+            print(alpha)
 
             add(0, r1, 1, r0, alpha[0]*self._dtau, r1)
 
@@ -109,7 +110,7 @@ class DualEulerPseudoStepper(BaseDualPseudoStepper):
         add(0, r2, 1, r0, alpha[0]*self._dtau, r1)
 
         rhs(0, r2, r3)
-        
+
         # take r3 norm, return it
         err = self._resid(self._dtau, r3)
         err = np.linalg.norm(err)
@@ -234,6 +235,121 @@ class DualRK4PseudoStepper(BaseDualPseudoStepper):
         return r1, r0
 
 
+class DualEulerAlphaPseudoStepper(BaseDualPseudoStepper):
+    pseudo_stepper_name = 'eulerAlpha'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Register a kernel to multiply rhs with local pseudo time-step
+        self.backend.pointwise.register(
+            'pyfr.integrators.dual.pseudo.kernels.localdtau'
+        )
+
+        tplargs = dict(ndims=self.system.ndims, nvars=self.system.nvars)
+
+        self.dtau_upts = proxylist([])
+        for ele, shape in zip(self.system.ele_map.values(),
+                              self.system.ele_shapes):
+            # Allocate storage for the local pseudo time-step
+            dtaumat = self.backend.matrix(shape, np.ones(shape)*self._dtau,
+                                          tags={'align'})
+            self.dtau_upts.append(dtaumat)
+
+            # Append the local dtau kernels to the proxylist
+            self.pintgkernels['localdtau'].append(
+                self.backend.kernel(
+                    'localdtau', tplargs=tplargs, dims=[ele.nupts, ele.neles],
+                    negdivconf=ele.scal_upts_inb, dtau_upts=dtaumat
+                )
+            )
+
+        self.backend.pointwise.register(
+            'pyfr.integrators.dual.pseudo.kernels.localalpha'
+        )
+
+        for ele, shape, dtaumat in zip(self.system.ele_map.values(),
+                                       self.system.ele_shapes, self.dtau_upts):
+            self.pintgkernels['localalpha'].append(
+                self.backend.kernel(
+                    'localalpha', tplargs=tplargs, dims=[ele.nupts, ele.neles],
+                    ru=ele.scal_upts_ru, re=ele.scal_upts_re,
+                    ro=ele.scal_upts_ro, dtau_upts=dtaumat,
+                    negdivconf=ele.scal_upts_outb, sol=ele.scal_upts_inb
+                )
+            )
+
+    def localdtau(self, uinbank, inv=0):
+        self.system.eles_scal_upts_inb.active = uinbank
+        self._queue % self.pintgkernels['localdtau'](inv=inv)
+
+    @property
+    def _pseudo_stepper_has_lerrest(self):
+        return False
+
+    @property
+    def _stepper_nfevals(self):
+        return self.nsteps
+
+    @property
+    def _pseudo_stepper_nregs(self):
+        return 5
+
+    @property
+    def _pseudo_stepper_order(self):
+        return 1
+
+    def step(self, t):
+        add = self._add
+        rhs = self._rhs_with_dts
+
+        r0, r1, ru, re, ro = self._pseudo_stepper_regidx
+
+        if r0 != self._idxcurr:
+            r0, r1 = r1, r0
+
+        rhs(t, r0, r1)
+        self.localdtau(r1)
+
+        if self.pslinesearch is False:
+            add(0, r1, 1, r0, 1, r1)
+        else:
+            au, ao = 0.999, 1.001
+
+            add(0, re, 1, r0, 1, r1)
+            rhs(t, re, re)
+
+            add(0, ro, 1, r0, ao, r1)
+            rhs(t, ro, ro)
+
+            add(0, ru, 1, r0, au, r1)
+            rhs(t, ru, ru)
+
+            self.system.eles_scal_upts_ru.active = ru
+            self.system.eles_scal_upts_re.active = re
+            self.system.eles_scal_upts_ro.active = ro
+            self.system.eles_scal_upts_inb.active = r0
+            self.system.eles_scal_upts_outb.active = r1
+            self._queue % self.pintgkernels['localalpha'](au=au, ao=ao)
+
+        return r1, r0
+
+    def objective_func(self, alpha):
+        add = self._add
+        rhs = self._rhs_with_dts
+
+        r0, r1, r2, r3 = self._pseudo_stepper_regidx
+
+        add(0, r2, 1, r0, alpha[0]*self._dtau, r1)
+
+        rhs(0, r2, r3)
+
+        # take r3 norm, return it
+        err = self._resid(self._dtau, r3)
+        err = np.linalg.norm(err)
+
+        return err
+
 class DualEmbeddedPairPseudoStepper(BaseDualPseudoStepper):
     # Coefficients
     a = []
@@ -332,6 +448,18 @@ class DualRKVdH2RPseudoStepper(DualEmbeddedPairPseudoStepper):
 
         # Return
         return (r2, rold, rerr) if errest else (r2, rold)
+
+
+class DualEuAlphaPseudoStepper(DualRKVdH2RPseudoStepper):
+    pseudo_stepper_name = 'eulera'
+
+    b = [1]
+
+    bhat = [1.01]
+
+    @property
+    def _pseudo_stepper_order(self):
+        return 1
 
 
 class DualRK34PseudoStepper(DualRKVdH2RPseudoStepper):

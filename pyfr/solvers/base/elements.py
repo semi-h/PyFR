@@ -212,6 +212,9 @@ class BaseElements(object):
                            for i in range(nscalupts)]
         self.scal_upts_inb = inb = backend.matrix_bank(self._scal_upts)
         self.scal_upts_outb = backend.matrix_bank(self._scal_upts)
+        self.scal_upts_ru = backend.matrix_bank(self._scal_upts)
+        self.scal_upts_re = backend.matrix_bank(self._scal_upts)
+        self.scal_upts_ro = backend.matrix_bank(self._scal_upts)
 
         # Find/allocate space for a solution-sized scalar that is
         # allowed to alias other scratch space in the simulation

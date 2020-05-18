@@ -54,6 +54,9 @@ class BaseSystem(object):
         # I/O banks for the elements
         self.eles_scal_upts_inb = eles.scal_upts_inb
         self.eles_scal_upts_outb = eles.scal_upts_outb
+        self.eles_scal_upts_ru = eles.scal_upts_ru
+        self.eles_scal_upts_re = eles.scal_upts_re
+        self.eles_scal_upts_ro = eles.scal_upts_ro
 
         # Save the number of dimensions and field variables
         self.ndims = eles[0].ndims
