@@ -5,8 +5,13 @@
 
 <%pyfr:kernel name='tflux' ndim='2'
               u='in fpdtype_t[${str(nvars)}]'
+              uout='out fpdtype_t[${str(nvars)}]'
+              rcpdjac='in fpdtype_t'
+              d='in fpdtype_t[${str(nvars)}]'
               smats='in fpdtype_t[${str(ndims)}][${str(ndims)}]'
-              f='out fpdtype_t[${str(ndims)}][${str(nvars)}]'>
+              f='inout fpdtype_t[${str(ndims)}][${str(nvars)}]'
+              func1='in fptr gimmik_ptr'
+              func2='in fptr gimmik_ptr'>
     // Compute the flux
     fpdtype_t ftemp[${ndims}][${nvars}];
     ${pyfr.expand('inviscid_flux', 'u', 'ftemp')};
@@ -17,4 +22,12 @@
                                  .format(i, k, j)
                                  for k in range(ndims))};
 % endfor
+
+//splithere
+
+//d
+% for i in enumerate(range(4)):
+    uout[${i}] = -rcpdjac*uout[${i}];
+% endfor
+
 </%pyfr:kernel>
