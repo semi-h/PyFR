@@ -72,5 +72,5 @@ class EulerElements(BaseFluidElements, BaseAdvectionElements):
                 'tflux', tplargs=tplargs, dims=[self.nupts, self.neles],
                 u=self.scal_upts_inb, smats=self.smat_at('upts'),
                 f=self._vect_upts, uout=self.scal_upts_outb,
-                func1=self.kernels['tdivtpcorf']().func_ptr
+                rcpdjac=self.rcpdjac_at('upts'), d=self._scal_fpts
             )

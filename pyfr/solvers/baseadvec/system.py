@@ -20,7 +20,11 @@ class BaseAdvectionSystem(BaseSystem):
         q1 << kernels['mpiint', 'scal_fpts_pack']()
         runall([q1])
 
-        q1 << kernels['eles', 'disu_int']()
+        #q1 << kernels['eles', 'disu_int']()
+        q1 << kernels['spiint', 'commpair_flux'](
+            exec=self.disu_int_e_ptr, blockk=self.disu_int_b_ptr,
+            cleank=self.disu_int_c_ptr
+        )
         if ('eles', 'copy_soln') in kernels:
             q1 << kernels['eles', 'copy_soln']()
         #q1 << kernels['eles', 'tdisf']()
@@ -35,7 +39,13 @@ class BaseAdvectionSystem(BaseSystem):
         runall([q1, q2])
 
         q1 << kernels['mpiint', 'comm_flux']()
-        q1 << kernels['eles', 'tdisf']()
+        q1 << kernels['eles', 'tdisf'](
+            exec1=self.tdivtpcorf_e_ptr, exec2=self.tdivtconf_e_ptr,
+            blockk1=self.tdivtpcorf_b_ptr, blockk2=self.tdivtconf_b_ptr,
+            cleank1=self.tdivtpcorf_c_ptr, cleank2=self.tdivtconf_c_ptr
+        )
+        #    func1=self.tdivtpcorf_func_ptr, func2=self.tdivtconf_func_ptr
+        #)
         #q1 << kernels['eles', 'tdivtconf']()
         #if ('eles', 'tdivf_qpts') in kernels:
         #    q1 << kernels['eles', 'tdivf_qpts']()

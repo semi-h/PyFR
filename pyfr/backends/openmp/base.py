@@ -20,7 +20,8 @@ class OpenMPBackend(BaseBackend):
 
         # Compute the SoA size
         self.soasz = self.alignb // np.dtype(self.fpdtype).itemsize
-        self.aosoasz = self.L2cache*1024//self.alignb//4//4*5
+        self.aosoasz = cfg.getint('backend-openmp', 'aosoa-sz', 8)
+        #self.aosoasz = self.L2cache*1024//self.alignb//4//4*5
 
         from pyfr.backends.openmp import (blasext, cblas, gimmik, packing,
                                           provider, types, xsmm)

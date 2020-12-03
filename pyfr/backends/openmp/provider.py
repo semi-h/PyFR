@@ -14,6 +14,14 @@ class OpenMPKernelProvider(BaseKernelProvider):
             f = open('tfluxgimm.cpp', 'w')
             f.write(src)
             f.close()
+        if name == 'intcflux':
+            f = open('intcflux.cpp', 'w')
+            f.write(src)
+            f.close()
+        if name == 'spintcflux':
+            f = open('commpair_flux.cpp', 'w')
+            f.write(src)
+            f.close()
         mod = SourceModule(src, self.backend.cfg)
         return mod.function(name, restype, argtypes)
 

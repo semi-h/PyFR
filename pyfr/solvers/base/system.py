@@ -12,6 +12,7 @@ from pyfr.util import proxylist, subclasses
 class BaseSystem(object):
     elementscls = None
     intinterscls = None
+    spintinterscls = None
     mpiinterscls = None
     bbcinterscls = None
 
@@ -54,14 +55,14 @@ class BaseSystem(object):
         self.nvars = eles[0].nvars
 
         # Load the interfaces
-        int_inters = self._load_int_inters(rallocs, mesh, elemap)
+        int_inters, spint_inters = self._load_int_inters(rallocs, mesh, elemap)
         mpi_inters = self._load_mpi_inters(rallocs, mesh, elemap)
         bc_inters = self._load_bc_inters(rallocs, mesh, elemap)
         backend.commit()
 
         # Prepare the queues and kernels
         self._gen_queues()
-        self._gen_kernels(eles, int_inters, mpi_inters, bc_inters)
+        self._gen_kernels(eles, int_inters, spint_inters, mpi_inters, bc_inters)
         backend.commit()
 
         # Save the BC interfaces, but delete the memory-intensive elemap
@@ -131,12 +132,48 @@ class BaseSystem(object):
         key = 'con_p{0}'.format(rallocs.prank)
 
         lhs, rhs = mesh[key].astype('U4,i4,i1,i1').tolist()
-        int_inters = self.intinterscls(self.backend, lhs, rhs, elemap,
+        print(lhs[0])
+        print(type(lhs[0]))
+        #print(mesh['spt_hex_p0'].shape[1])
+        print('nfaces', len(lhs))
+
+        # separate subpartition interfaces
+        spsize = 64
+        splhs = list()
+        sprhs = list()
+        ilhs = list()
+        irhs = list()
+        import numpy as np
+        if 'spt_tet_p0' in mesh:
+            k = 'spt_tet_p0'
+        elif 'spt_hex_p0' in mesh:
+            k = 'spt_hex_p0'
+        nfpts = np.zeros(mesh[k].shape[1]//spsize+1, dtype=np.int)
+        for idx, (lc, rc) in enumerate(zip(lhs, rhs)):
+            if lc[1]//spsize == rc[1]//spsize:
+                splhs.append(lc)
+                sprhs.append(rc)
+                nfpts[lc[1]//spsize] += 1
+            else:
+                ilhs.append(lc)
+                irhs.append(rc)
+
+        print(nfpts)
+        print('sumnfpts', sum(nfpts))
+        for i in range(len(nfpts[:-1])):
+            nfpts[i+1] = nfpts[i] + nfpts[i+1]
+        print(nfpts)
+        #for i in nfpts:
+        #    print(splhs[i], sprhs[i])
+
+        int_inters = self.intinterscls(self.backend, ilhs, irhs, elemap,
                                        self.cfg)
+        spint_inters = self.spintinterscls(self.backend, splhs, sprhs, elemap,
+                                           self.cfg, nfpts=nfpts)
 
         # Although we only have a single internal interfaces instance
         # we wrap it in a proxylist for consistency
-        return proxylist([int_inters])
+        return proxylist([int_inters]), proxylist([spint_inters])
 
     def _load_mpi_inters(self, rallocs, mesh, elemap):
         lhsprank = rallocs.prank
@@ -181,16 +218,32 @@ class BaseSystem(object):
     def _gen_queues(self):
         self._queues = [self.backend.queue() for i in range(self._nqueues)]
 
-    def _gen_kernels(self, eles, iint, mpiint, bcint):
+    def _gen_kernels(self, eles, iint, spiint, mpiint, bcint):
         self._kernels = kernels = defaultdict(proxylist)
 
-        provnames = ['eles', 'iint', 'mpiint', 'bcint']
-        provobjs = [eles, iint, mpiint, bcint]
+        provnames = ['eles', 'iint', 'spiint', 'mpiint', 'bcint']
+        provobjs = [eles, iint, spiint, mpiint, bcint]
 
         for pn, pobj in zip(provnames, provobjs):
             for kn, kgetter in it.chain(*pobj.kernels.items()):
                 if not kn.startswith('_'):
-                    kernels[pn, kn].append(kgetter())
+                    klambda = kgetter()
+                    if kn == 'tdivtpcorf':
+                        self.tdivtpcorf_e_ptr = getattr(klambda, 'e_ptr')
+                        self.tdivtpcorf_b_ptr = getattr(klambda, 'b_ptr')
+                        self.tdivtpcorf_c_ptr = getattr(klambda, 'c_ptr')
+                        #self.tdivtpcorf_func_ptr = getattr(klambda, 'func_ptr')
+                    if kn == 'tdivtconf':
+                        self.tdivtconf_e_ptr = getattr(klambda, 'e_ptr')
+                        self.tdivtconf_b_ptr = getattr(klambda, 'b_ptr')
+                        self.tdivtconf_c_ptr = getattr(klambda, 'c_ptr')
+                        #self.tdivtconf_func_ptr = getattr(klambda, 'func_ptr')
+                    if kn == 'disu_int':
+                        self.disu_int_e_ptr = getattr(klambda, 'e_ptr')
+                        self.disu_int_b_ptr = getattr(klambda, 'b_ptr')
+                        self.disu_int_c_ptr = getattr(klambda, 'c_ptr')
+                        #self.disu_int_func_ptr = getattr(klambda, 'func_ptr')
+                    kernels[pn, kn].append(klambda)
 
     def rhs(self, t, uinbank, foutbank):
         pass

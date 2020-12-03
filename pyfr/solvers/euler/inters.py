@@ -22,6 +22,29 @@ class EulerIntInters(BaseAdvectionIntInters):
         )
 
 
+class EulerSpIntInters(BaseAdvectionIntInters):
+    def __init__(self, backend, lhs, rhs, elemap, cfg, nfpts, **kwargs):
+        super().__init__(backend, lhs, rhs, elemap, cfg, **kwargs)
+
+        self._be.pointwise.register('pyfr.solvers.euler.kernels.spintcflux')
+
+        rsolver = self.cfg.get('solver-interfaces', 'riemann-solver')
+        tplargs = dict(ndims=self.ndims, nvars=self.nvars, rsolver=rsolver,
+                       c=self._tpl_c)
+
+        elem = list(self.elemap.keys())[0]
+        self.nfptsarr = self._be.matrix((len(nfpts), 1))
+        self.nfptsarr.set(nfpts.reshape(-1, 1))
+
+        self.kernels['commpair_flux'] = lambda: self._be.kernel(
+            'spintcflux', tplargs=tplargs, dims=[self.elemap[elem].neles],
+            ul=self._scal_lhs, ur=self._scal_rhs,
+            magnl=self._mag_pnorm_lhs, nl=self._norm_pnorm_lhs,
+            u=self.elemap[elem].scal_upts_inb, d=self.elemap[elem]._scal_fpts,
+            nfpts=self.nfptsarr
+        )
+
+
 class EulerMPIInters(BaseAdvectionMPIInters):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

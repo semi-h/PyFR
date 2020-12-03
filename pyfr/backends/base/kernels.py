@@ -112,7 +112,7 @@ class BasePointwiseKernelProvider(BaseKernelProvider):
                 ka = argdict[aname]
             except KeyError:
                 # Allow scalar arguments to be resolved at runtime
-                if len(atypes) == 1 and atypes[0] == self.backend.fpdtype:
+                if len(atypes) == 1: #and atypes[0] == self.backend.fpdtype:
                     ka = aname
                 else:
                     raise
