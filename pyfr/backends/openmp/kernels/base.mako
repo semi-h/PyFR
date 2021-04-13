@@ -4,6 +4,7 @@
 #include <omp.h>
 #include <stdlib.h>
 #include <tgmath.h>
+#include <stdio.h>
 
 #define SOA_SZ ${soasz}
 #define BLK_SZ ${csubsz}
@@ -13,5 +14,10 @@
 
 // Typedefs
 typedef ${pyfr.npdtype_to_ctype(fpdtype)} fpdtype_t;
+typedef void (*gimmik_ptr) (int, fpdtype_t *, int, fpdtype_t *, int, double, double);
+
+typedef void (*libxsmm_xfsspmdm_execute)(void *, const fpdtype_t *, fpdtype_t *);
+
+typedef void *vptr;
 
 ${next.body()}

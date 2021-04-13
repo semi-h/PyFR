@@ -37,11 +37,11 @@ class BaseAdvectionDiffusionElements(BaseAdvectionElements):
         )
         self.kernels['tgradpcoru_upts'] = lambda: kernel(
             'mul', self.opmat('M4 - M6*M0'), self.scal_upts_inb,
-            out=self._vect_upts
+            out=self._vect_upts, nmex='tgradpcoru_upts'
         )
         self.kernels['tgradcoru_upts'] = lambda: kernel(
             'mul', self.opmat('M6'), self._vect_fpts.slice(0, self.nfpts),
-            out=self._vect_upts, beta=1.0
+            out=self._vect_upts, beta=1.0, nmex='tgradcoru_upts'
         )
 
         # Template arguments for the physical gradient kernel
@@ -76,7 +76,8 @@ class BaseAdvectionDiffusionElements(BaseAdvectionElements):
             # Exploit the block-diagonal form of the operator
             muls = [kernel('mul', self.opmat('M0'),
                            vupts.slice(i*nupts, (i + 1)*nupts),
-                           vfpts.slice(i*nfpts, (i + 1)*nfpts))
+                           vfpts.slice(i*nfpts, (i + 1)*nfpts),
+                           nmex='gradcoru_fpts')
                     for i in range(self.ndims)]
 
             return ComputeMetaKernel(muls)
@@ -91,7 +92,8 @@ class BaseAdvectionDiffusionElements(BaseAdvectionElements):
                 # Exploit the block-diagonal form of the operator
                 muls = [self._be.kernel('mul', self.opmat('M7'),
                                         vupts.slice(i*nupts, (i + 1)*nupts),
-                                        vqpts.slice(i*nqpts, (i + 1)*nqpts))
+                                        vqpts.slice(i*nqpts, (i + 1)*nqpts),
+                                        nmex='gradcoru_qpts')
                         for i in range(self.ndims)]
 
                 return ComputeMetaKernel(muls)

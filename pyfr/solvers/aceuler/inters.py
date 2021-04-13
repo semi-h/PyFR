@@ -22,6 +22,38 @@ class ACEulerIntInters(BaseAdvectionIntInters):
         )
 
 
+class ACEulerSpIntInters(BaseAdvectionIntInters):
+    def __init__(self, backend, lhs, rhs, elemap, cfg, nfpts, **kwargs):
+        super().__init__(backend, lhs, rhs, elemap, cfg, **kwargs)
+
+        self._be.pointwise.register('pyfr.solvers.aceuler.kernels.spintcflux')
+
+        rsolver = self.cfg.get('solver-interfaces', 'riemann-solver')
+        tplargs = dict(ndims=self.ndims, nvars=self.nvars, rsolver=rsolver,
+                       c=self._tpl_c)
+
+        print('spintinters nfpts')
+        print(len(nfpts))
+        print('lenperm', len(self._perm), type(self._perm), len(lhs))
+        # gets the first element type, hex or tet
+        elem = list(self.elemap.keys())[0]
+        print('neles', self.elemap[elem].neles, elem)
+        #print(self._perm)
+        #print(lhs[self._perm])
+        self.nfptsarr = self._be.matrix((len(nfpts), 1))
+        self.nfptsarr.set(nfpts.reshape(-1, 1))
+        #temparr = self.nfptsarr.get()
+        #print(nfpts.reshape(-1, 1))
+        #print(temparr)
+        self.kernels['commpair_flux'] = lambda: self._be.kernel(
+            'spintcflux', tplargs=tplargs, dims=[self.elemap[elem].neles],
+            ul=self._scal_lhs, ur=self._scal_rhs,
+            magnl=self._mag_pnorm_lhs, nl=self._norm_pnorm_lhs,
+            u=self.elemap[elem].scal_upts_inb, d=self.elemap[elem]._scal_fpts,
+            nfpts=self.nfptsarr
+        )
+
+
 class ACEulerMPIInters(BaseAdvectionMPIInters):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

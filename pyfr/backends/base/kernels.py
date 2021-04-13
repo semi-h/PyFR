@@ -36,6 +36,9 @@ class _MetaKernel(object):
     def __init__(self, kernels):
         self._kernels = list(kernels)
 
+    def __getattr__(self, attr):
+        return [getattr(x, attr) for x in self._kernels]
+
     def run(self, queue, *args, **kwargs):
         for k in self._kernels:
             k.run(queue, *args, **kwargs)
@@ -111,7 +114,7 @@ class BasePointwiseKernelProvider(BaseKernelProvider):
                 ka = argdict[aname]
             except KeyError:
                 # Allow scalar arguments to be resolved at runtime
-                if len(atypes) == 1 and atypes[0] == self.backend.fpdtype:
+                if len(atypes) == 1: #and atypes[0] == self.backend.fpdtype:
                     ka = aname
                 else:
                     raise

@@ -27,7 +27,7 @@ class BaseAdvectionDiffusionSystem(BaseAdvectionSystem):
         if ('eles', 'shocksensor') in kernels:
             q1.enqueue(kernels['eles', 'shocksensor'])
             q1.enqueue(kernels['mpiint', 'artvisc_fpts_pack'])
-        q1.enqueue(kernels['eles', 'tgradpcoru_upts'])
+        #q1.enqueue(kernels['eles', 'tgradpcoru_upts'])
         q2.enqueue(kernels['mpiint', 'scal_fpts_send'])
         q2.enqueue(kernels['mpiint', 'scal_fpts_recv'])
         q2.enqueue(kernels['mpiint', 'scal_fpts_unpack'])
@@ -35,11 +35,11 @@ class BaseAdvectionDiffusionSystem(BaseAdvectionSystem):
         runall([q1, q2])
 
         q1.enqueue(kernels['mpiint', 'con_u'])
-        q1.enqueue(kernels['eles', 'tgradcoru_upts'])
-        q1.enqueue(kernels['eles', 'gradcoru_upts_curved'])
-        q1.enqueue(kernels['eles', 'gradcoru_upts_linear'])
-        q1.enqueue(kernels['eles', 'gradcoru_fpts'])
-        q1.enqueue(kernels['mpiint', 'vect_fpts_pack'])
+        #q1.enqueue(kernels['eles', 'tgradcoru_upts'])
+        #q1.enqueue(kernels['eles', 'gradcoru_upts_curved'])
+        #q1.enqueue(kernels['eles', 'gradcoru_upts_linear'])
+        #q1.enqueue(kernels['eles', 'gradcoru_fpts'])
+        #q1.enqueue(kernels['mpiint', 'vect_fpts_pack'])  # take care of this for parallel runs
         if ('eles', 'shockvar') in kernels:
             q2.enqueue(kernels['mpiint', 'artvisc_fpts_send'])
             q2.enqueue(kernels['mpiint', 'artvisc_fpts_recv'])
@@ -49,23 +49,55 @@ class BaseAdvectionDiffusionSystem(BaseAdvectionSystem):
 
         if ('eles', 'gradcoru_qpts') in kernels:
             q1.enqueue(kernels['eles', 'gradcoru_qpts'])
-        if ('eles', 'qptsu') in kernels:
-            q1.enqueue(kernels['eles', 'qptsu'])
-        q1.enqueue(kernels['eles', 'tdisf_curved'])
-        q1.enqueue(kernels['eles', 'tdisf_linear'])
-        q1.enqueue(kernels['eles', 'tdivtpcorf'])
+        #if ('eles', 'qptsu') in kernels:
+        #    q1.enqueue(kernels['eles', 'qptsu'])
+        q1.enqueue(
+            kernels['eles', 'tdisf_curved'],
+            tdivtpcorf_exec=self.tdivtpcorf_exec,
+            tdivtpcorf_blkk=self.tdivtpcorf_blkk,
+            tgradpcoru_exec=self.tgradpcoru_exec,
+            tgradpcoru_blkk=self.tgradpcoru_blkk,
+            tgradcoru_exec=self.tgradcoru_exec,
+            tgradcoru_blkk=self.tgradcoru_blkk,
+            gradcoru_fpts0_exec=self.gradcoru_fpts_exec[0],
+            gradcoru_fpts0_blkk=self.gradcoru_fpts_blkk[0],
+            gradcoru_fpts1_exec=self.gradcoru_fpts_exec[1],
+            gradcoru_fpts1_blkk=self.gradcoru_fpts_blkk[1],
+            gradcoru_fpts2_exec=self.gradcoru_fpts_exec[2],
+            gradcoru_fpts2_blkk=self.gradcoru_fpts_blkk[2],
+        )
+        q1.enqueue( #kernels['eles', 'tdisf_linear'])
+            kernels['eles', 'tdisf_linear'],
+            tdivtpcorf_exec=self.tdivtpcorf_exec,
+            tdivtpcorf_blkk=self.tdivtpcorf_blkk,
+            tgradpcoru_exec=self.tgradpcoru_exec,
+            tgradpcoru_blkk=self.tgradpcoru_blkk,
+            tgradcoru_exec=self.tgradcoru_exec,
+            tgradcoru_blkk=self.tgradcoru_blkk,
+            gradcoru_fpts0_exec=self.gradcoru_fpts_exec[0],
+            gradcoru_fpts0_blkk=self.gradcoru_fpts_blkk[0],
+            gradcoru_fpts1_exec=self.gradcoru_fpts_exec[1],
+            gradcoru_fpts1_blkk=self.gradcoru_fpts_blkk[1],
+            gradcoru_fpts2_exec=self.gradcoru_fpts_exec[2],
+            gradcoru_fpts2_blkk=self.gradcoru_fpts_blkk[2],
+        )
+        #q1.enqueue(kernels['eles', 'tdivtpcorf'])
         q1.enqueue(kernels['iint', 'comm_flux'])
         q1.enqueue(kernels['bcint', 'comm_flux'], t=t)
 
-        q2.enqueue(kernels['mpiint', 'vect_fpts_send'])
-        q2.enqueue(kernels['mpiint', 'vect_fpts_recv'])
-        q2.enqueue(kernels['mpiint', 'vect_fpts_unpack'])
+        #q2.enqueue(kernels['mpiint', 'vect_fpts_send'])
+        #q2.enqueue(kernels['mpiint', 'vect_fpts_recv'])
+        #q2.enqueue(kernels['mpiint', 'vect_fpts_unpack'])
 
         runall([q1, q2])
 
         q1.enqueue(kernels['mpiint', 'comm_flux'])
-        q1.enqueue(kernels['eles', 'tdivtconf'])
-        q1.enqueue(kernels['eles', 'negdivconf'], t=t)
+        #q1.enqueue(kernels['eles', 'tdivtconf'])
+        q1.enqueue(
+            kernels['eles', 'negdivconf'], t=t,
+            tdivtconf_exec=self.tdivtconf_exec,
+            tdivtconf_blkk=self.tdivtconf_blkk
+        )
         runall([q1])
 
     def compute_grads(self, t, uinbank):

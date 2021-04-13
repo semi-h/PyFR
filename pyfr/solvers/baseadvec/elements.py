@@ -44,7 +44,7 @@ class BaseAdvectionElements(BaseElements):
         # Interpolation from elemental points
         kernels['disu'] = lambda: self._be.kernel(
             'mul', self.opmat('M0'), self.scal_upts_inb,
-            out=self._scal_fpts
+            out=self._scal_fpts, nmex='disu'
         )
 
         if fluxaa:
@@ -62,13 +62,13 @@ class BaseAdvectionElements(BaseElements):
         else:
             kernels['tdivtpcorf'] = lambda: self._be.kernel(
                 'mul', self.opmat('M1 - M3*M2'), self._vect_upts,
-                out=self.scal_upts_outb
+                out=self.scal_upts_outb, nmex='tdivtpcorf'
             )
 
         # Second flux correction kernel
         kernels['tdivtconf'] = lambda: self._be.kernel(
             'mul', self.opmat('M3'), self._scal_fpts, out=self.scal_upts_outb,
-            beta=1.0
+            beta=1.0, nmex='tdivtconf'
         )
 
         # Transformed to physical divergence kernel + source term
@@ -83,7 +83,8 @@ class BaseAdvectionElements(BaseElements):
         kernels['negdivconf'] = lambda: self._be.kernel(
             'negdivconf', tplargs=srctplargs,
             dims=[self.nupts, self.neles], tdivtconf=self.scal_upts_outb,
-            rcpdjac=self.rcpdjac_at('upts'), ploc=plocupts, u=solnupts
+            rcpdjac=self.rcpdjac_at('upts'), ploc=plocupts, u=solnupts,
+            d=self._scal_fpts
         )
 
         # In-place solution filter

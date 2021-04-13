@@ -171,6 +171,8 @@ class BaseElements(object):
         else:
             self._linoff = self.neles
 
+        print('linoff', self._linoff, self.neles)
+
         # Sizes
         ndims, nvars, neles = self.ndims, self.nvars, self.neles
         nfpts, nupts, nqpts = self.nfpts, self.nupts, self.nqpts

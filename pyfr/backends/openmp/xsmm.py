@@ -58,7 +58,8 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
 
             self._wrappers.libxsmm_finalize()
 
-    def mul(self, a, b, out, alpha=1.0, beta=0.0):
+    def mul(self, a, b, out, alpha=1.0, beta=0.0, nmex=None):
+
         # Ensure the matrices are compatible
         if a.nrow != out.nrow or a.ncol != b.nrow or b.ncol != out.ncol:
             raise ValueError('Incompatible matrices for out = a*b')
@@ -87,7 +88,12 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
         except KeyError:
             c_is_nt = (beta == 0 and
                        out.nbytes >= 32*1024**2 and
-                       self.backend.alignb >= 64)
+                       self.backend.alignb >= 64) # pair C
+
+            c_is_nt = 1 if nmex == 'disu' else 0 # pair B
+            #c_is_nt = 0 # pair A
+
+            print('xsmm kernel: ', nmex, 'non-temporal: ', c_is_nt)
 
             a_np = np.ascontiguousarray(a.get())
             m, k = a_np.shape
@@ -113,7 +119,18 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
         # Build
         batch_gemm = self._build_kernel('batch_gemm', src, argt)
 
+        name = 'par_xsmm_' + (nmex if nmex else '')
+        print(name, 'xsmm.py')
+
+        # Build
+        #par_xsmm = self._build_kernel(name, src.replace('par_xsmm', name),
+        #                              argt)
+
         class MulKernel(ComputeKernel):
+            func_ptr = cast(batch_gemm, c_void_p).value
+            e_ptr = cast(self._execfn, c_void_p).value
+            b_ptr = blkptr
+
             def run(iself, queue):
                 batch_gemm(execptr, blkptr, b.nblocks, b, b.blocksz, out,
                            out.blocksz)

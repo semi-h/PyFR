@@ -63,20 +63,26 @@ class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
             pts, npts = 'qpts', self.nqpts
         else:
             u = lambda s: self._slice_mat(self.scal_upts_inb, s)
+            uout = lambda s: self._slice_mat(self.scal_upts_outb, s)
+            d = lambda s: self._slice_mat(self._scal_fpts, s)
             f = lambda s: self._slice_mat(self._vect_upts, s)
+            c = lambda s: self._slice_mat(self._vect_fpts, s)
             pts, npts = 'upts', self.nupts
 
         av = self.artvisc
 
         # Mesh regions
         regions = self._mesh_regions
+        print('regions', regions)
 
         if 'curved' in regions:
             self.kernels['tdisf_curved'] = lambda: self._be.kernel(
                 'tflux', tplargs=tplargs, dims=[npts, regions['curved']],
                 u=u('curved'), f=f('curved'),
                 artvisc=self._slice_mat(av, 'curved') if av else None,
-                smats=self.smat_at(pts, 'curved')
+                smats=self.smat_at(pts, 'curved'),
+                uout=uout('curved'), rcpdjac=self.rcpdjac_at('upts', 'curved'),
+                d=d('curved'), c=c('curved')
             )
 
         if 'linear' in regions:
@@ -85,5 +91,6 @@ class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
                 'tfluxlin', tplargs=tplargs, dims=[npts, regions['linear']],
                 u=u('linear'), f=f('linear'),
                 artvisc=self._slice_mat(av, 'linear') if av else None,
-                verts=self.ploc_at('linspts', 'linear'), upts=upts
+                verts=self.ploc_at('linspts', 'linear'), upts=upts,
+                uout=uout('linear'), d=d('linear'), c=c('linear')
             )

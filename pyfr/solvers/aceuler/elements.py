@@ -55,6 +55,8 @@ class ACEulerElements(BaseACFluidElements, BaseAdvectionElements):
             pts, npts = 'qpts', self.nqpts
         else:
             u = lambda s: self._slice_mat(self.scal_upts_inb, s)
+            uout = lambda s: self._slice_mat(self.scal_upts_outb, s)
+            d = lambda s: self._slice_mat(self._scal_fpts, s)
             f = lambda s: self._slice_mat(self._vect_upts, s)
             pts, npts = 'upts', self.nupts
 
@@ -65,7 +67,9 @@ class ACEulerElements(BaseACFluidElements, BaseAdvectionElements):
             self.kernels['tdisf_curved'] = lambda: self._be.kernel(
                 'tflux', tplargs=tplargs, dims=[npts, regions['curved']],
                 u=u('curved'), f=f('curved'),
-                smats=self.smat_at(pts, 'curved')
+                smats=self.smat_at(pts, 'curved'),
+                uout=uout('curved'), rcpdjac=self.rcpdjac_at('upts', 'curved'),
+                d=d('curved')
             )
 
         if 'linear' in regions:
@@ -73,5 +77,7 @@ class ACEulerElements(BaseACFluidElements, BaseAdvectionElements):
             self.kernels['tdisf_linear'] = lambda: self._be.kernel(
                 'tfluxlin', tplargs=tplargs, dims=[npts, regions['linear']],
                 u=u('linear'), f=f('linear'),
-                verts=self.ploc_at('linspts', 'linear'), upts=upts
+                verts=self.ploc_at('linspts', 'linear'), upts=upts,
+                uout=uout('linear'), rcpdjac=self.rcpdjac_at('upts', 'linear'),
+                d=d('linear')
             )

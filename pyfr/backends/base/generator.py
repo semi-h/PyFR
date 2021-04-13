@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import re
+from ctypes import c_void_p
 
 import numpy as np
 
@@ -12,10 +13,10 @@ class Arg(object):
         self.name = name
 
         specptn = r'''
-            (?:(in|inout|out)\s+)?                           # Intent
-            (?:(broadcast(?:-row|-col)|mpi|scalar|view)\s+)? # Attrs
-            ([A-Za-z_]\w*)                                   # Data type
-            ((?:\[\d+\]){0,2})$                              # Dimensions
+            (?:(in|inout|out)\s+)?                                 # Intent
+            (?:(broadcast(?:-row|-col)|mpi|scalar|view|fptr)\s+)?  # Attrs
+            ([A-Za-z_]\w*)                                         # Data type
+            ((?:\[\d+\]){0,2})$                                    # Dimensions
         '''
         dimsptn = r'(?<=\[)\d+(?=\])'
         usedptn = fr'(?:[^A-Za-z]|^){name}[^A-Za-z0-9]'
@@ -43,7 +44,10 @@ class Arg(object):
         self.isused = bool(re.search(usedptn, body))
         self.isview = self.attrs == 'view'
         self.isscalar = self.attrs == 'scalar'
-        self.isvector = not self.isscalar
+        self.isfptr = self.attrs == 'fptr'
+        self.isvector = not (self.isscalar or self.isfptr)
+        if self.isfptr:
+            self.isused = True
 
         # Validation
         if self.attrs.startswith('broadcast') and self.intent != 'in':
@@ -70,6 +74,7 @@ class BaseKernelGenerator(object):
 
         # Break arguments into point-scalars and point-vectors
         self.scalargs = [v for v in sargs if v.isscalar]
+        self.fptrargs = [v for v in sargs if v.isfptr]
         self.vectargs = [v for v in sargs if v.isvector]
 
         # If we are 2D ensure none of our arguments are views
@@ -98,6 +103,10 @@ class BaseKernelGenerator(object):
         # Scalar args (always of type fpdtype)
         argn += [sa.name for sa in self.scalargs]
         argt += [[self.fpdtype]]*len(self.scalargs)
+
+        # Function pointer args
+        argn += [sa.name for sa in self.fptrargs]
+        argt += [[c_void_p]]*len(self.fptrargs)
 
         # Vector args
         for va in self.vectargs:

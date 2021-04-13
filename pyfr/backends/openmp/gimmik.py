@@ -16,7 +16,7 @@ class OpenMPGiMMiKKernels(OpenMPKernelProvider):
         self.max_nnz = backend.cfg.getint('backend-openmp', 'gimmik-max-nnz',
                                           512)
 
-    def mul(self, a, b, out, alpha=1.0, beta=0.0):
+    def mul(self, a, b, out, alpha=1.0, beta=0.0, nmex=None):
         # Ensure the matrices are compatible
         if a.nrow != out.nrow or a.ncol != b.nrow or b.ncol != out.ncol:
             raise ValueError('Incompatible matrices for out = a*b')
@@ -32,7 +32,10 @@ class OpenMPGiMMiKKernels(OpenMPKernelProvider):
         # Generate the GiMMiK kernel
         src = generate_mm(a.get(), dtype=a.dtype, platform='c',
                           alpha=alpha, beta=beta)
-        gimmik_mm = self._build_kernel('gimmik_mm', src,
+
+        name = 'gimmik_mm_' + (nmex if nmex else '')
+
+        gimmik_mm = self._build_kernel(name, src.replace('gimmik_mm', name),
                                        [np.int32] + [np.intp, np.int32]*2)
         gimmik_ptr = cast(gimmik_mm, c_void_p).value
 
@@ -47,7 +50,11 @@ class OpenMPGiMMiKKernels(OpenMPKernelProvider):
         # Build
         batch_gemm = self._build_kernel('batch_gemm', src, argt)
 
+        print(name, gimmik_mm)
+
         class MulKernel(ComputeKernel):
+            func_ptr = gimmik_ptr
+
             def run(self, queue):
                 batch_gemm(gimmik_ptr, b.leaddim, b.nblocks, b, b.blocksz, out,
                            out.blocksz)
