@@ -7,7 +7,7 @@ from pyfr.solvers.baseadvec import BaseAdvectionElements
 class BaseAdvectionDiffusionElements(BaseAdvectionElements):
     @property
     def _scratch_bufs(self):
-        bufs = {'scal_fpts', 'vect_fpts', 'vect_upts'}
+        bufs = {'scal_fpts', 'vect_fpts', 'vect_upts', 'vect_grads'}
 
         if 'flux' in self.antialias:
             bufs |= {'scal_qpts', 'vect_qpts'}
@@ -70,7 +70,7 @@ class BaseAdvectionDiffusionElements(BaseAdvectionElements):
 
         def gradcoru_fpts():
             nupts, nfpts = self.nupts, self.nfpts
-            vupts, vfpts = self._vect_upts, self._vect_fpts
+            vupts, vfpts = self._vect_grads, self._vect_fpts
 
             # Exploit the block-diagonal form of the operator
             muls = [kernel('mul', self.opmat('M0'),

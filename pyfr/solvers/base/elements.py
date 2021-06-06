@@ -200,6 +200,8 @@ class BaseElements(object):
         # Allocate required vector scratch space
         if 'vect_upts' in sbufs:
             self._vect_upts = valloc('vect_upts', nupts)
+        if 'vect_grads' in sbufs:
+            self._vect_grads = valloc('vect_grads', nupts)
         if 'vect_qpts' in sbufs:
             self._vect_qpts = valloc('vect_qpts', nqpts)
         if 'vect_fpts' in sbufs:
