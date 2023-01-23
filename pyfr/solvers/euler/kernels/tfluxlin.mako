@@ -11,16 +11,7 @@
               upts='in broadcast-row fpdtype_t[${str(ndims)}]'
               uout='out fpdtype_t[${str(nvars)}]'
               rcpdjac='in fpdtype_t'
-              d='inout fpdtype_t[${str(nvars)}]'
-              disu_exec='in fptr libxsmm_xfsspmdm_execute'
-              tdivtpcorf_exec='in fptr libxsmm_xfsspmdm_execute'
-              tdivtconf_exec='in fptr libxsmm_xfsspmdm_execute'
-              disu_blkk='in fptr vptr'
-              tdivtconf_blkk='in fptr vptr'
-              tdivtpcorf_blkk='in fptr vptr'>
-              //qptsu_exec='in fptr libxsmm_xfsspmdm_execute'
-              //qptsu_blkk='in fptr vptr'
-              //uu='in fpdtype_t[${str(nvars)}]'
+              d='inout fpdtype_t[${str(nvars)}]'>
 //              func1='in fptr gimmik_ptr'
 //              func2='in fptr gimmik_ptr'>
 //uu

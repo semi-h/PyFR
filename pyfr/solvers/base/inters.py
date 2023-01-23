@@ -52,6 +52,12 @@ class BaseInters(object):
         self._external_args = {}
         self._external_vals = {}
 
+        # Global defs
+        self.cdefs = f'''
+            #define nvars {self.nvars}
+            #define ndims {self.ndims}
+        '''
+
     def prepare(self, t):
         pass
 

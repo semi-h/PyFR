@@ -58,7 +58,27 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
 
             self._wrappers.libxsmm_finalize()
 
-    def mul(self, a, b, out, alpha=1.0, beta=0.0, nmex=None):
+    def mul(self, a, b, out, alpha=1.0, beta=0.0, nmex=None, a_facs=[]):
+
+        # Check if a_facs present and if so it matches the original matrix
+        if a_facs and a.nrow != a_facs[0].nrow and a.ncol != a_facs[-1].ncol:
+            raise ValueError('Factor sizes do not match the original matrix')
+
+        if len(a_facs) == 2:
+            if np.allclose(a.get(), a_facs[0].get() @ a_facs[1].get()):
+                print('decomposed matrix is close to the original', nmex)
+            else:
+                print('decomposed matrix is not equal to the original!!!!', nmex)
+        if len(a_facs) == 3:
+            if np.allclose(a.get(), a_facs[0].get() @ a_facs[1].get() @ a_facs[2].get()):
+                print('decomposed matrix is close to the original', nmex)
+            else:
+                print('decomposed matrix is not equal to the original!!!!', nmex)
+        if len(a_facs) == 4:
+            if np.allclose(a.get(), a_facs[0].get() @ a_facs[1].get() @ a_facs[2].get() @ a_facs[3].get()):
+                print('decomposed matrix is close to the original', nmex)
+            else:
+                print('decomposed matrix is not equal to the original!!!!', nmex)
 
         # Ensure the matrices are compatible
         if a.nrow != out.nrow or a.ncol != b.nrow or b.ncol != out.ncol:
@@ -90,7 +110,7 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
                        out.nbytes >= 32*1024**2 and
                        self.backend.alignb >= 64) # pair C
 
-            c_is_nt = 1 if nmex == 'disu' else 0 # pair B
+            c_is_nt = 1 if nmex == 'disu' or nmex == 'tdivtpcorf' else 0 # pair B
             #c_is_nt = 0 # pair A
 
             print('xsmm kernel: ', nmex, 'non-temporal: ', c_is_nt)
@@ -101,6 +121,25 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
             # JIT and register an block leaddim size kernel for this matrix
             blkptr = self._createfn(m, b.leaddim, k, k, ldb, ldc, alpha,
                                     beta, c_is_nt, a_np.ctypes.data)
+
+            if a_facs:
+                blkptr_facs = []
+                for fac in a_facs:
+                    mat = np.ascontiguousarray(fac.get())
+                    m, kk = mat.shape
+                    print('nmex shape', nmex, m, kk, ldb, ldc, alpha, beta)
+                    if fac == a_facs[0]:
+                        _beta = beta
+                        _c_is_nt = c_is_nt
+                    else:
+                        _beta = 0
+                        _c_is_nt = 0
+                    blkptr_facs.append(
+                        self._createfn(m, b.leaddim, kk, kk, ldb, ldc, alpha,
+                                       _beta, _c_is_nt, mat.ctypes.data)
+                    )
+                    if not blkptr_facs[-1]:
+                        raise NotSuitableError('libxssm unable to JIT a tensor product kernel')
             if not blkptr:
                 raise NotSuitableError('libxssm unable to JIT a kernel')
 
@@ -110,11 +149,20 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
         # Obtain a pointer to the execute function
         execptr = cast(self._execfn, c_void_p).value
 
+        if nmex == 'disu' and a_facs:
+            krnl = 'disut'
+        elif nmex == 'disu':
+            krnl = 'disup'
         # Render our parallel wrapper kernel
-        src = self.backend.lookup.get_template('batch-gemm').render(lib='xsmm')
+        src = self.backend.lookup.get_template('batch-gemm').render(
+            lib='xsmm', krnl=nmex + 't' if nmex=='disu' and a_facs else nmex
+        )
 
         # Argument types for batch_gemm
-        argt = [np.intp] + [np.intp, np.int32]*3
+        if nmex=='disu' and a_facs:
+            argt = [np.intp]*4 + [np.intp, np.int32]*3
+        else:
+            argt = [np.intp] + [np.intp, np.int32]*3
 
         # Build
         batch_gemm = self._build_kernel('batch_gemm', src, argt)
@@ -130,9 +178,17 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
             func_ptr = cast(batch_gemm, c_void_p).value
             e_ptr = cast(self._execfn, c_void_p).value
             b_ptr = blkptr
+            if a_facs:
+                bfac_ptr = blkptr_facs
 
-            def run(iself, queue):
-                batch_gemm(execptr, blkptr, b.nblocks, b, b.blocksz, out,
-                           out.blocksz)
+            if nmex=='disu' and a_facs:
+                print('nmex a_facs!!', nmex, *blkptr_facs, out.blocksz)
+                def run(iself, queue):
+                    batch_gemm(execptr, *blkptr_facs, b.nblocks, b, b.blocksz, out,
+                               out.blocksz)
+            else:
+                def run(iself, queue):
+                    batch_gemm(execptr, blkptr, b.nblocks, b, b.blocksz, out,
+                               out.blocksz)
 
         return MulKernel()

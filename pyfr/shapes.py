@@ -21,6 +21,73 @@ def _proj_pts(projector, pts):
 def _proj_l2(qrule, basis):
     return basis.vdm.T @ (qrule.wts*basis.ortho_basis_at(qrule.pts))
 
+def _utoq(m7):
+    nx, ny = m7.shape
+    p1 = int(np.cbrt(ny) - 1)
+    p2 = int(np.cbrt(nx) - 1)
+
+    uniques = np.zeros([p2+1, p1+1])
+
+    for i in range(p2+1):
+        for j in range(p1+1):
+            #print(i*(p2+2),j*(p1+2),m7[i*(p2+2),j*(p1+2)])
+            uniques[i,j] = np.cbrt(m7[i*((p2+1)*(p2+2)+1),j*((p1+1)*(p1+2)+1)])
+
+    #M = J*K*L
+
+    # Interpolate in x
+    L = np.zeros([(p1+1)*(p1+1)*(p2+1), (p1+1)*(p1+1)*(p1+1)])
+    for k in range((p1+1)*(p1+1)):
+        L[k*(p2+1):(k+1)*(p2+1),k*(p1+1):(k+1)*(p1+1)] = uniques[:,:]
+
+    # Interpolate in y
+    K = np.zeros([(p2+1)*(p2+1)*(p1+1), (p1+1)*(p1+1)*(p2+1)])
+    for l in range(p1+1):
+        for k in range(p2+1):
+            for i in range(p2+1):
+                for j in range(p1+1):
+                    K[i*(p2+1)+k+l*(p2+1)*(p2+1),j*(p2+1)+k+l*(p2+1)*(p1+1)] = uniques[i,j]
+
+    # Interpolate in z
+    J = np.zeros([(p2+1)*(p2+1)*(p2+1), (p1+1)*(p2+1)*(p2+1)])
+    for k in range((p2+1)*(p2+1)):
+        for i in range(p2+1):
+            for j in range(p1+1):
+                J[i*(p2+1)*(p2+1)+k, j*(p2+1)*(p2+1)+k] = uniques[i,j]
+
+    return J, K, L
+
+def _utoq_pri(locp, locq, triM7):
+    p1, p2 = len(locp)-1, len(locq)-1
+
+    # Determine linear interpolator from p1 to p3
+    uniques = np.zeros((p2+1, p1+1))
+    for col in range(p1 + 1):
+        denom = 1
+        for i in range(p1 + 1):
+            if i == col:
+                continue
+            denom *= locp[col] - locp[i]
+        for row in range(p2 + 1):
+            nom = 1
+            for i in range(p1 + 1):
+                if i == col:
+                    continue
+                nom *= locq[row] - locp[i]
+            uniques[row, col] = nom / denom
+
+    # Apply quadrature in planes
+    midpriM7 = np.kron(np.eye(p1 + 1), triM7)
+
+    trinqpts, trinupts = triM7.shape
+    print('triqshape', triM7.shape)
+    priM7z = np.zeros((trinqpts * len(locq), trinqpts * len(locp)))
+    for many in range(trinqpts):
+        for row in range(p2 + 1):
+            for col in range(p1 + 1):
+                priM7z[row * trinqpts + many, col * trinqpts + many] = uniques[row, col]
+
+    return priM7z, midpriM7
 
 class BaseShape(object):
     name = None

@@ -133,14 +133,21 @@ def kernel(context, name, ndim, **kwargs):
     # Merge local and external arguments
     kwargs = dict(kwargs, **extrns)
 
+    # cdefs
+    cdefs = context['_cdefs']
+
+    # injection
+    inject = context['_inject']
+
     # Capture the kernel body
     body = capture(context, context['caller'].body)
+    #print('makoutil kernel: body', name, body)
 
     # Get the generator class and floating point data type
     kerngen, fpdtype = context['_kernel_generator'], context['fpdtype']
 
     # Instantiate
-    kern = kerngen(name, int(ndim), kwargs, body, fpdtype)
+    kern = kerngen(name, int(ndim), kwargs, cdefs, inject, body, fpdtype)
 
     # Save the argument/type list for later use
     context['_kernel_argspecs'][name] = kern.argspec()

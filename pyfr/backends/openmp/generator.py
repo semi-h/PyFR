@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from itertools import chain, zip_longest
+
 from pyfr.backends.base.generator import BaseKernelGenerator
 
 
@@ -65,11 +67,10 @@ class OpenMPKernelGenerator(BaseKernelGenerator):
 
         porder = 4
         pn = porder+1
-        nupts, nfpts, nvar, nfpf = pn**3, 6*pn**2, 5, pn**2
-        qpts = (pn+1)**3
+        nfpf = pn**2
         #tets
-        nupts, nfpts, nvar, nfpf = (pn*(pn+1)*(pn+2))//6, 4*pn*(pn+1)//2, 5, pn*(pn+1)//2
-        print(nupts, nfpts, nvar, nfpf)
+        #nupts, nfpts, nvar, nfpf = (pn*(pn+1)*(pn+2))//6, 4*pn*(pn+1)//2, 5, pn*(pn+1)//2
+        print(nfpf)
 
         navstokes = True
         # pairA | pairB | pairC
@@ -80,107 +81,107 @@ class OpenMPKernelGenerator(BaseKernelGenerator):
             # Navier-Stokes
             print('navstokes')
             corepack = f'''
-                       fpdtype_t buffarr[Nu*3*BLK_SZ*NVAR];
-                       fpdtype_t gbuff[Nu*3*BLK_SZ*NVAR];
-                       tgradpcoru_exec(tgradpcoru_blkk, u_v+ib*BLK_SZ*NVAR*Nu, buffarr);
-                       tgradcoru_exec(tgradcoru_blkk, d_v+ib*BLK_SZ*NVAR*Nfpts, buffarr);
+                       fpdtype_t buffarr[nupts*ndims*BLK_SZ*nvars];
+                       fpdtype_t gbuff[nupts*ndims*BLK_SZ*nvars];
+                       tgradpcoru_exec(tgradpcoru_blkk, u_v+ib*BLK_SZ*nvars*nupts, buffarr);
+                       tgradcoru_exec(tgradcoru_blkk, d_v+ib*BLK_SZ*nvars*nfpts, buffarr);
                        {core[0]}
-                       gradcoru_fpts0_exec(gradcoru_fpts0_blkk, gbuff, c_v+(ib*3)*BLK_SZ*NVAR*Nfpts);
-                       gradcoru_fpts1_exec(gradcoru_fpts1_blkk, gbuff+BLK_SZ*NVAR*Nu, c_v+(ib*3+1)*BLK_SZ*NVAR*Nfpts);
-                       gradcoru_fpts2_exec(gradcoru_fpts2_blkk, gbuff+2*BLK_SZ*NVAR*Nu, c_v+(ib*3+2)*BLK_SZ*NVAR*Nfpts);
+                       gradcoru_fpts0_exec(gradcoru_fpts0_blkk, gbuff, c_v+(ib*3)*BLK_SZ*nvars*nfpts);
+                       gradcoru_fpts1_exec(gradcoru_fpts1_blkk, gbuff+BLK_SZ*nvars*nupts, c_v+(ib*3+1)*BLK_SZ*nvars*nfpts);
+                       gradcoru_fpts2_exec(gradcoru_fpts2_blkk, gbuff+2*BLK_SZ*nvars*nupts, c_v+(ib*3+2)*BLK_SZ*nvars*nfpts);
                        //core[1]
-                       tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*NVAR*Nu);
+                       tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*nvars*nupts);
                        '''
             cleanpack = f'''
-                        fpdtype_t buffarr[Nu*3*BLK_SZ*NVAR];
-                        fpdtype_t gbuff[Nu*3*BLK_SZ*NVAR];
-                        tgradpcoru_exec(tgradpcoru_blkk, u_v+ib*BLK_SZ*NVAR*Nu, buffarr);
-                        tgradcoru_exec(tgradcoru_blkk, d_v+ib*BLK_SZ*NVAR*Nfpts, buffarr);
+                        fpdtype_t buffarr[nupts*ndims*BLK_SZ*nvars];
+                        fpdtype_t gbuff[nupts*ndims*BLK_SZ*nvars];
+                        tgradpcoru_exec(tgradpcoru_blkk, u_v+ib*BLK_SZ*nvars*nupts, buffarr);
+                        tgradcoru_exec(tgradcoru_blkk, d_v+ib*BLK_SZ*nvars*nfpts, buffarr);
                         {clean[0]}
-                        gradcoru_fpts0_exec(gradcoru_fpts0_blkk, gbuff, c_v+(ib*3)*BLK_SZ*NVAR*Nfpts);
-                        gradcoru_fpts1_exec(gradcoru_fpts1_blkk, gbuff+BLK_SZ*NVAR*Nu, c_v+(ib*3+1)*BLK_SZ*NVAR*Nfpts);
-                        gradcoru_fpts2_exec(gradcoru_fpts2_blkk, gbuff+2*BLK_SZ*NVAR*Nu, c_v+(ib*3+2)*BLK_SZ*NVAR*Nfpts);
+                        gradcoru_fpts0_exec(gradcoru_fpts0_blkk, gbuff, c_v+(ib*3)*BLK_SZ*nvars*nfpts);
+                        gradcoru_fpts1_exec(gradcoru_fpts1_blkk, gbuff+BLK_SZ*nvars*nupts, c_v+(ib*3+1)*BLK_SZ*nvars*nfpts);
+                        gradcoru_fpts2_exec(gradcoru_fpts2_blkk, gbuff+2*BLK_SZ*nvars*nupts, c_v+(ib*3+2)*BLK_SZ*nvars*nfpts);
                         //clean[1]
-                        tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*NVAR*Nu);
+                        tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*nvars*nupts);
                         '''
         elif (krnlgrouping == 'pairA' or krnlgrouping == 'pairB') and \
                 (self.name == 'tflux' or self.name == 'tfluxlin'):
             print('tflux is here pairA or pairB')
-            func1 = 'exec1(blockk1, buffarr, uout_v+ib*BLK_SZ*NVAR*Nu);'
-            func2 = 'exec2(blockk2, d_v+ib*BLK_SZ*NVAR*Nfpts, uout_v+ib*BLK_SZ*NVAR*Nu);'
+            func1 = 'exec1(blockk1, buffarr, uout_v+ib*BLK_SZ*nvars*nupts);'
+            func2 = 'exec2(blockk2, d_v+ib*BLK_SZ*nvars*nfpts, uout_v+ib*BLK_SZ*nvars*nupts);'
             #buffarr = 'buffarr = (fpdtype_t*) calloc(64*3*SZ*4, sizeof(fpdtype_t)); //valid for p3 hex'
-            #buffarr = '__attribute__((aligned(64))) fpdtype_t buffarr[Nu*3*BLK_SZ*NVAR];'
-            buffarr = 'fpdtype_t buffarr[Nu*3*BLK_SZ*NVAR];'
+            #buffarr = '__attribute__((aligned(64))) fpdtype_t buffarr[nupts*ndims*BLK_SZ*nvars];'
+            buffarr = 'fpdtype_t buffarr[nupts*ndims*BLK_SZ*nvars];'
             corepack = f'''
-                       //qptsu_exec(qptsu_blkk, uu_v+ib*BLK_SZ*NVAR*Nu, u_v+ib*BLK_SZ*NVAR*qpts);
-                       //fpdtype_t buffarr[qpts*3*BLK_SZ*NVAR];
-                       fpdtype_t buffarr[Nu*3*BLK_SZ*NVAR];
+                       //qptsu_exec(qptsu_blkk, uu_v+ib*BLK_SZ*nvars*nupts, u_v+ib*BLK_SZ*nvars*nqpts);
+                       //fpdtype_t buffarr[nqpts*ndims*BLK_SZ*nvars];
+                       fpdtype_t buffarr[nupts*ndims*BLK_SZ*nvars];
                        {core[0]}
-                       tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*NVAR*Nu);
-                       tdivtconf_exec(tdivtconf_blkk, d_v+ib*BLK_SZ*NVAR*Nfpts, uout_v+ib*BLK_SZ*NVAR*Nu);
-                       //_nyy = Nu;
+                       tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*nvars*nupts);
+                       tdivtconf_exec(tdivtconf_blkk, d_v+ib*BLK_SZ*nvars*nfpts, uout_v+ib*BLK_SZ*nvars*nupts);
+                       //_nyy = nupts;
                        {core[1]}
                        '''
             cleanpack = f'''
-                        //qptsu_exec(qptsu_blkk, uu_v+ib*BLK_SZ*NVAR*Nu, u_v+ib*BLK_SZ*NVAR*qpts);
-                        //fpdtype_t buffarr[qpts*3*BLK_SZ*NVAR];
-                        fpdtype_t buffarr[Nu*3*BLK_SZ*NVAR];
+                        //qptsu_exec(qptsu_blkk, uu_v+ib*BLK_SZ*nvars*nupts, u_v+ib*BLK_SZ*nvars*nqpts);
+                        //fpdtype_t buffarr[nqpts*ndims*BLK_SZ*nvars];
+                        fpdtype_t buffarr[nupts*ndims*BLK_SZ*nvars];
                         {clean[0]}
-                        tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*NVAR*Nu);
-                        tdivtconf_exec(tdivtconf_blkk, d_v+ib*BLK_SZ*NVAR*Nfpts, uout_v+ib*BLK_SZ*NVAR*Nu);
-                        //_nyy = Nu;
+                        tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*nvars*nupts);
+                        tdivtconf_exec(tdivtconf_blkk, d_v+ib*BLK_SZ*nvars*nfpts, uout_v+ib*BLK_SZ*nvars*nupts);
+                        //_nyy = nupts;
                         {clean[1]}
                         '''
         elif (krnlgrouping == 'pairC') and \
                 (self.name == 'tflux' or self.name == 'tfluxlin'):
             print('tflux is here, pairC')
-            func1 = 'exec1(blockk1, buffarr, uout_v+ib*BLK_SZ*NVAR*Nu);'
-            func2 = 'exec2(blockk2, d_v+ib*BLK_SZ*NVAR*Nfpts, uout_v+ib*BLK_SZ*NVAR*Nu);'
+            func1 = 'exec1(blockk1, buffarr, uout_v+ib*BLK_SZ*nvars*nupts);'
+            func2 = 'exec2(blockk2, d_v+ib*BLK_SZ*nvars*nfpts, uout_v+ib*BLK_SZ*nvars*nupts);'
             #buffarr = 'buffarr = (fpdtype_t*) calloc(64*3*SZ*4, sizeof(fpdtype_t)); //valid for p3 hex'
-            #buffarr = '__attribute__((aligned(64))) fpdtype_t buffarr[Nu*3*BLK_SZ*NVAR];'
-            buffarr = 'fpdtype_t buffarr[Nu*3*BLK_SZ*NVAR];'
+            #buffarr = '__attribute__((aligned(64))) fpdtype_t buffarr[nupts*ndims*BLK_SZ*nvars];'
+            buffarr = 'fpdtype_t buffarr[nupts*ndims*BLK_SZ*nvars];'
             corepack = f'''
                        {buffarr}
-                       disu_exec(disu_blkk, u_v+ib*BLK_SZ*NVAR*Nu, d_v+ib*BLK_SZ*NVAR*Nfpts);
+                       disu_exec(disu_blkk, u_v+ib*BLK_SZ*nvars*nupts, d_v+ib*BLK_SZ*nvars*nfpts);
                        {core[0]}
-                       tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*NVAR*Nu);
+                       tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*nvars*nupts);
                        '''
             cleanpack = f'''
                         {buffarr}
-                        disu_exec(disu_blkk, u_v+ib*BLK_SZ*NVAR*Nu, d_v+ib*BLK_SZ*NVAR*Nfpts);
+                        disu_exec(disu_blkk, u_v+ib*BLK_SZ*nvars*nupts, d_v+ib*BLK_SZ*nvars*nfpts);
                         {clean[0]}
-                        tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*NVAR*Nu);
+                        tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*nvars*nupts);
                         '''
         elif (navstokes or krnlgrouping == 'pairC') and self.name == 'negdivconf':
             corepack = f'''
-                       tdivtconf_exec(tdivtconf_blkk, d_v+ib*BLK_SZ*NVAR*Nfpts, tdivtconf_v+ib*BLK_SZ*NVAR*Nu);
+                       tdivtconf_exec(tdivtconf_blkk, d_v+ib*BLK_SZ*nvars*nfpts, tdivtconf_v+ib*BLK_SZ*nvars*nupts);
                        {core[0]}
                        '''
             cleanpack = f'''
-                        tdivtconf_exec(tdivtconf_blkk, d_v+ib*BLK_SZ*NVAR*Nfpts, tdivtconf_v+ib*BLK_SZ*NVAR*Nu);
+                        tdivtconf_exec(tdivtconf_blkk, d_v+ib*BLK_SZ*nvars*nfpts, tdivtconf_v+ib*BLK_SZ*nvars*nupts);
                         {clean[0]}
                         '''
         elif krnlgrouping == 'pairD' and \
             (self.name == 'tflux' or self.name == 'tfluxlin'):
             print('tflux is here pairD')
             #buffarr = 'buffarr = (fpdtype_t*) calloc(64*3*SZ*4, sizeof(fpdtype_t)); //valid for p3 hex'
-            #buffarr = '__attribute__((aligned(64))) fpdtype_t buffarr[Nu*3*BLK_SZ*NVAR];'
-            buffarr = 'fpdtype_t buffarr[Nu*3*BLK_SZ*NVAR];'
+            #buffarr = '__attribute__((aligned(64))) fpdtype_t buffarr[nupts*ndims*BLK_SZ*nvars];'
+            buffarr = 'fpdtype_t buffarr[nupts*ndims*BLK_SZ*nvars];'
             corepack = f'''
-                       fpdtype_t buffarr[Nu*3*BLK_SZ*NVAR];
+                       fpdtype_t buffarr[nupts*ndims*BLK_SZ*nvars];
                        {core[0]}
-                       tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*NVAR*Nu);
-                       //tdivtpcorf_exec(tdivtpcorf_blkk, f_v+ib*BLK_SZ*NVAR*Nu*3, uout_v+ib*BLK_SZ*NVAR*Nu);
+                       tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*nvars*nupts);
+                       //tdivtpcorf_exec(tdivtpcorf_blkk, f_v+ib*BLK_SZ*nvars*nupts*ndims, uout_v+ib*BLK_SZ*nvars*nupts);
                        '''
             cleanpack = f'''
-                        //fpdtype_t buffarr[Nu*3*BLK_SZ*NVAR];
+                        //fpdtype_t buffarr[nupts*ndims*BLK_SZ*nvars];
                         {clean[0]}
-                        //tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*NVAR*Nu);
-                        //tdivtpcorf_exec(tdivtpcorf_blkk, f_v+ib*BLK_SZ*NVAR*Nu*3, uout_v+ib*BLK_SZ*NVAR*Nu);
+                        //tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*nvars*nupts);
+                        //tdivtpcorf_exec(tdivtpcorf_blkk, f_v+ib*BLK_SZ*nvars*nupts*ndims, uout_v+ib*BLK_SZ*nvars*nupts);
                         '''
         elif self.name == 'spintcflux':
             print('spintcflux core')
-            func2 = 'exec(blockk, u_v+ib*BLK_SZ*NVAR*Nu, d_v+ib*BLK_SZ*NVAR*Nfpts);'
+            func2 = 'exec(blockk, u_v+ib*BLK_SZ*nvars*nupts, d_v+ib*BLK_SZ*nvars*nfpts);'
             corepack = f'''
                        {func2}
                        //begin
@@ -275,7 +276,17 @@ class OpenMPKernelGenerator(BaseKernelGenerator):
             corepack = f'{core[0]}'
             cleanpack = f'{clean[0]}'
 
-        nyy = 'int _nyy = _ny;' if self.ndim == 2 else ''
+        corepack = '\n'.join(
+            [x for x in chain.from_iterable(zip_longest(self.inject, core))
+             if x]
+        )
+        cleanpack = '\n'.join(
+            [x for x in chain.from_iterable(zip_longest(self.inject, clean))
+             if x]
+        )
+
+        #nyy = 'int _nyy = _ny;' if self.ndim == 2 else ''
+        nyy = 'int _ny = _nyy;' if self.ndim == 2 else ''
 
         return f'''{self._render_spec()}
                {{
@@ -284,25 +295,23 @@ class OpenMPKernelGenerator(BaseKernelGenerator):
                int _remj = (_nx % BLK_SZ) % SOA_SZ;
                #define X_IDX (_xi + _xj)
                #define X_IDX_AOSOA(v, nv) ((_xi/SOA_SZ*(nv) + (v))*SOA_SZ + _xj)
-               #define Nu {nupts}
-               #define NVAR {nvar}
-               #define Nfpts {nfpts}
+               {self.cdefs}
                #define Nfpf {nfpf}
-               #define qpts {qpts}
                #define BLK_IDX ib*BLK_SZ
                #define BCAST_BLK(i, ld) ((i) % (ld) + ((i) / (ld))*(ld)*_ny)
                #pragma omp parallel for
                for (int ibo = 0; ibo < nci; ibo++)
                {{
                    int ib = ibo;
-                   //nyy
+                   {nyy}
+                   //_ny = _nyy;
                    {corepack}
                }}
                //if ( _remi != 0 && _remj != 0 )
                if ( !(_remi == 0 && _remj == 0) )
                {{
                    int ib = nci;
-                   //nyy
+                   {nyy}
                    {cleanpack}
                }}
                #undef X_IDX

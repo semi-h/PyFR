@@ -88,12 +88,22 @@ class OpenMPQueue(base.Queue):
 
             self._exec_item(*self._items.popleft())
 
+        #from mpi4py import MPI
+
+        #print('at exec nonblock', self.mpi_reqs, type(self.mpi_reqs))
+        #MPI.Request.testall(self.mpi_reqs)
+        #MPI.Prequest.Startall(self.mpi_reqs)
+
     def _wait(self):
         if self._last_ktype == 'mpi':
             from mpi4py import MPI
 
+            #print('atwait', self.mpi_reqs, type(self.mpi_reqs))
             MPI.Prequest.Waitall(self.mpi_reqs)
+            #print('must be all true', MPI.Request.testall(self.mpi_reqs))
+            #print('atwait', self.mpi_reqs, type(self.mpi_reqs))
             self.mpi_reqs = []
+            #print('atwait', self.mpi_reqs, type(self.mpi_reqs))
 
         self._last_ktype = None
 
@@ -106,7 +116,17 @@ class OpenMPQueue(base.Queue):
         for q in queues:
             q._exec_nonblock()
 
+        #mpi_reqs = []
+        #for q in queues:
+        #    mpi_reqs.extend(q.mpi_reqs)
+
         while any(queues):
+            #from mpi4py import MPI
+
+            #print('at while queues', mpi_reqs, type(mpi_reqs))
+            #MPI.Request.testall(mpi_reqs)
+            #print(MPI.Request.testall(mpi_reqs))
+
             # Execute a (potentially) blocking item from each queue
             for q in filter(None, queues):
                 q._exec_nowait()

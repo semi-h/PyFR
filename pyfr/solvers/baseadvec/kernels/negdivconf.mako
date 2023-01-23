@@ -8,9 +8,9 @@
               ploc='in fpdtype_t[${str(ndims)}]'
               u='in fpdtype_t[${str(nvars)}]'
               rcpdjac='in fpdtype_t'
-              d='in fpdtype_t[${str(nvars)}]'
-              tdivtconf_exec='in fptr libxsmm_xfsspmdm_execute'
-              tdivtconf_blkk='in fptr vptr'>
+              d='in fpdtype_t[${str(nvars)}]'>
+              //tdivtconf_exec='in fptr libxsmm_xfsspmdm_execute'
+              //tdivtconf_blkk='in fptr vptr'>
 // d for scal_fpts
 % for i, ex in enumerate(srcex):
     tdivtconf[${i}] = -rcpdjac*tdivtconf[${i}] + ${ex};

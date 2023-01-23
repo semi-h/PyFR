@@ -15,12 +15,28 @@ class OpenMPKernelProvider(BaseKernelProvider):
             f = open('spintcflux.c', 'w')
             f.write(src)
             f.close()
+        if name=='intcflux':
+            f = open('intcflux.c', 'w')
+            f.write(src)
+            f.close()
         if name=='tfluxlin':
             f = open('tfluxlin.c', 'w')
             f.write(src)
             f.close()
         if name=='tflux':
             f = open('tflux.c', 'w')
+            f.write(src)
+            f.close()
+        if name=='negdivconf':
+            f = open('negdivconf.c', 'w')
+            f.write(src)
+            f.close()
+        if name=='bcconu':
+            f = open('bcconu.c', 'w')
+            f.write(src)
+            f.close()
+        if name=='batch_gemm':
+            f = open('disu.c', 'a')
             f.write(src)
             f.close()
         mod = SourceModule(src, self.backend.cfg)
@@ -31,13 +47,14 @@ class OpenMPPointwiseKernelProvider(OpenMPKernelProvider,
                                     BasePointwiseKernelProvider):
     kernel_generator_cls = OpenMPKernelGenerator
 
-    def _instantiate_kernel(self, dims, fun, arglst):
+    def _instantiate_kernel(self, dims, fun, arglst, argmv):
         class PointwiseKernel(ComputeKernel):
             if any(isinstance(arg, str) for arg in arglst):
                 def run(self, queue, **kwargs):
+                    #print('kwargs', kwargs)
                     fun(*[kwargs.get(ka, ka) for ka in arglst])
             else:
                 def run(self, queue, **kwargs):
                     fun(*arglst)
 
-        return PointwiseKernel()
+        return PointwiseKernel(*argmv)

@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 
+import numpy as np
+
 from pyfr.backends.base.kernels import ComputeMetaKernel
 from pyfr.polys import get_polybasis
 from pyfr.solvers.baseadvec import BaseAdvectionElements
+from pyfr.shapes import _utoq, _utoq_pri
 
 
 class BaseAdvectionDiffusionElements(BaseAdvectionElements):
@@ -39,10 +42,30 @@ class BaseAdvectionDiffusionElements(BaseAdvectionElements):
             'mul', self.opmat('M4 - M6*M0'), self.scal_upts_inb,
             out=self._vect_upts, nmex='tgradpcoru_upts'
         )
-        self.kernels['tgradcoru_upts'] = lambda: kernel(
-            'mul', self.opmat('M6'), self._vect_fpts.slice(0, self.nfpts),
-            out=self._vect_upts, beta=1.0, nmex='tgradcoru_upts'
-        )
+
+        if 'surf-flux' in self.antialias and self.basis.name == 'hex':
+            M6facs = [np.kron(np.eye(self.ndims), m)
+                      for m in _utoq(self.basis.opmat('M8'))] + [self.basisq.opmat('M6')]
+            self.kernels['tgradcoru_upts'] = lambda: kernel(
+                'mul', self.opmat('M6'), self._vect_fpts.slice(0, self.nfpts),
+                out=self._vect_upts, beta=1.0, nmex='tgradcoru_upts',
+                a_facs=self.opmat_facs(M6facs)
+            )
+        elif 'surf-flux' in self.antialias and self.basis.name == 'pri':
+            locp = self.basis.upts[::self.basis.nupts // (self.basis.order + 1)][:, 2]
+            locq = self.basisq.upts[::self.basisq.nupts // (self.basisq.order + 1)][:, 2]
+            M6facspri = [np.kron(np.eye(self.ndims), m)
+                      for m in _utoq_pri(locq, locp, self.basistri.opmat('M8'))] + [self.basisq.opmat('M6')]
+            self.kernels['tgradcoru_upts'] = lambda: kernel(
+                'mul', self.opmat('M6'), self._vect_fpts.slice(0, self.nfpts),
+                out=self._vect_upts, beta=1.0, nmex='tgradcoru_upts',
+                a_facs=self.opmat_facs(M6facspri)
+            )
+        else:
+            self.kernels['tgradcoru_upts'] = lambda: kernel(
+                'mul', self.opmat('M6'), self._vect_fpts.slice(0, self.nfpts),
+                out=self._vect_upts, beta=1.0, nmex='tgradcoru_upts'
+            )
 
         # Template arguments for the physical gradient kernel
         tplargs = {

@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 
+import copy
 import math
 import re
 
 import numpy as np
 
 from pyfr.nputil import npeval, fuzzysort
-from pyfr.util import lazyprop, memoize
+from pyfr.util import lazyprop, memoize, subclass_where
+from pyfr.shapes import BaseShape
 
 
 class BaseElements(object):
@@ -35,12 +37,33 @@ class BaseElements(object):
 
         # Instantiate the basis class
         self.basis = basis = basiscls(nspts, cfg)
+        print('basis name', self.basis.name)
+        pq = cfg.getint(f'solver-elements-{self.basis.name}', 'quad-deg', 0)
+        if pq:
+            cfgp = copy.deepcopy(cfg)
+            #cfgp.set('solver', 'order', (pq - 1)//2)
+            cfgp.set('solver', 'order', self.basis.order+1)
+            print('CFG stuff porder, porder+', cfg.getint('solver', 'order'),
+                                               cfgp.getint('solver', 'order'))
+            self.basisq = basiscls(nspts, cfgp)
+
+        if self.basis.name == 'pri':
+            cfgt = copy.deepcopy(cfg)
+            cfgt.set('solver-elements-tri', 'soln-pts', 'williams-shunn')
+            cfgt.set('solver-elements-tri', 'quad-pts', 'williams-shunn')
+            cfgt.set('solver-elements-tri', 'quad-deg',
+                     cfgt.getint('solver-elements-pri', 'quad-deg'))
+            tricls = subclass_where(BaseShape, name='tri')
+            self.basistri = tricls(3, cfgt)
+            #self.basistri = basiscls(3, cfgt)
 
         # See what kind of projection the basis is using
         self.antialias = basis.antialias
 
         # If we need quadrature points or not
         haveqpts = 'flux' in self.antialias
+        if haveqpts:
+            print('nqpts', haveqpts, basis.nqpts)
 
         # Sizes
         self.nupts = basis.nupts
@@ -48,6 +71,35 @@ class BaseElements(object):
         self.nfpts = basis.nfpts
         self.nfacefpts = basis.nfacefpts
         self.nmpts = basis.nmpts
+
+        # Global macros
+        self.cdefs = f'''
+            #define nupts {self.nupts}
+            #define nqpts {basis.nqpts if haveqpts else self.nupts}
+            #define nfpts {self.nfpts}
+            #define nfacefpts {self.nfacefpts[0]}
+            #define nvars {self.nvars}
+            #define ndims {self.ndims}
+        '''
+
+        # Global kernel arguments
+        self._external_args = {}
+        self._external_vals = {}
+
+        self._set_external('nupts', 'scalar int', self.nupts)
+        if haveqpts:
+            self._set_external('nqpts', 'scalar int', self.nqpts)
+        self._set_external('nfpts', 'scalar int', self.nfpts)
+        print('nfacefpts', self.nfacefpts)
+        self._set_external('nfacefpts', 'scalar int', self.nfacefpts[0])
+        self._set_external('nvars', 'scalar int', self.nvars)
+        self._set_external('ndims', 'scalar int', self.ndims)
+
+    def _set_external(self, name, spec, value=None):
+        self._external_args[name] = spec
+
+        if value is not None:
+            self._external_vals[name] = value
 
     def pri_to_con(pris, cfg):
         pass
@@ -220,6 +272,10 @@ class BaseElements(object):
     def opmat(self, expr):
         return self._be.const_matrix(self.basis.opmat(expr),
                                      tags={expr, 'align'})
+
+    @memoize
+    def opmat_facs(self, mats):
+        return [self._be.const_matrix(m) for m in mats]
 
     def sliceat(fn):
         @memoize

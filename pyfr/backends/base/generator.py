@@ -56,15 +56,18 @@ class Arg(object):
             raise ValueError('Row broadcasts must have one dimension')
         if self.isbroadcastc and self.ncdim == 1:
             raise ValueError('Column broadcasts must have zero or two dims')
-        if self.isscalar and self.dtype != 'fpdtype_t':
+        if self.isscalar and not (self.dtype == 'fpdtype_t' or
+                                  self.dtype == 'int'):
             raise ValueError('Scalar arguments must be of type fpdtype_t')
 
 
 class BaseKernelGenerator(object):
-    def __init__(self, name, ndim, args, body, fpdtype):
+    def __init__(self, name, ndim, args, cdefs, inject, body, fpdtype):
         self.name = name
         self.ndim = ndim
         self.fpdtype = fpdtype
+        self.cdefs = cdefs
+        self.inject = inject
 
         # Parse and sort our argument list
         sargs = sorted((k, Arg(k, v, body)) for k, v in args.items())
@@ -86,11 +89,13 @@ class BaseKernelGenerator(object):
         if ndim == 2 and any(v.ismpi for v in self.vectargs):
             raise ValueError('MPI matrices are not supported for 2D kernels')
 
+        #print('base generator body before render', body)
         # Render the main body of our kernel
         self.body = self._render_body(body)
+        #print('base generator body', self.body)
 
         # Determine the dimensions to be iterated over
-        self._dims = ['_nx'] if ndim == 1 else ['_ny', '_nx']
+        self._dims = ['_nx'] if ndim == 1 else ['_nyy', '_nx']
 
     def argspec(self):
         # Argument names and types
@@ -102,7 +107,8 @@ class BaseKernelGenerator(object):
 
         # Scalar args (always of type fpdtype)
         argn += [sa.name for sa in self.scalargs]
-        argt += [[self.fpdtype]]*len(self.scalargs)
+        #argt += [[self.fpdtype]]*len(self.scalargs)
+        argt += [[np.int32] if sa.dtype=='int' else [self.fpdtype] for sa in self.scalargs]
 
         # Function pointer args
         argn += [sa.name for sa in self.fptrargs]
@@ -120,6 +126,7 @@ class BaseKernelGenerator(object):
                 argt.append([np.intp])
 
         # Return
+        print('argnames', argn, argt)
         return self.ndim, argn, argt
 
     def ldim_size(self, name, *factor):

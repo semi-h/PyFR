@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 
+import numpy as np
+
 from pyfr.backends.base import ComputeMetaKernel
 from pyfr.solvers.base import BaseElements
+from pyfr.shapes import _utoq, _utoq_pri
 
 
 class BaseAdvectionElements(BaseElements):
@@ -42,22 +45,73 @@ class BaseAdvectionElements(BaseElements):
         }
 
         # Interpolation from elemental points
-        kernels['disu'] = lambda: self._be.kernel(
-            'mul', self.opmat('M0'), self.scal_upts_inb,
-            out=self._scal_fpts, nmex='disu'
-        )
+        if 'surf-flux' in self.antialias and self.basis.name == 'hex':
+            M0facs = [self.basisq.opmat('M0')] + list(_utoq(self.basis.opmat('M7')))
+            kernels['disu'] = lambda: self._be.kernel(
+                'mul', self.opmat('M0'), self.scal_upts_inb,
+                out=self._scal_fpts, nmex='disu', a_facs=self.opmat_facs(M0facs)
+            )
+        elif 'surf-flux' in self.antialias and self.basis.name == 'pri':
+            locp = self.basis.upts[::self.basis.nupts // (self.basis.order + 1)][:, 2]
+            locq = self.basisq.upts[::self.basisq.nupts // (self.basisq.order + 1)][:, 2]
+            print('locp, locq', locp, locq)
+            M0facspri = [self.basisq.opmat('M0')] + list(_utoq_pri(locp, locq, self.basistri.opmat('M7')))
+            kernels['disu'] = lambda: self._be.kernel(
+                'mul', self.opmat('M0'), self.scal_upts_inb,
+                out=self._scal_fpts, nmex='disupri', a_facs=self.opmat_facs(M0facspri)
+            )
+        else:
+            kernels['disu'] = lambda: self._be.kernel(
+                'mul', self.opmat('M0'), self.scal_upts_inb,
+                out=self._scal_fpts, nmex='disu'
+            )
 
-        if fluxaa:
+        if fluxaa and self.basis.name == 'hex':
             kernels['qptsu'] = lambda: self._be.kernel(
                 'mul', self.opmat('M7'), self.scal_upts_inb,
-                out=self._scal_qpts
+                out=self._scal_qpts, nmex='qptsu',
+                a_facs=self.opmat_facs(_utoq(self.basis.opmat('M7')))
+            )
+        elif fluxaa and self.basis.name == 'pri':
+            locp = self.basis.upts[::self.basis.nupts // (self.basis.order + 1)][:, 2]
+            locq = self.basisq.upts[::self.basisq.nupts // (self.basisq.order + 1)][:, 2]
+            kernels['qptsu'] = lambda: self._be.kernel(
+                'mul', self.opmat('M7'), self.scal_upts_inb,
+                out=self._scal_qpts, nmex='qptsu',
+                a_facs=self.opmat_facs(_utoq_pri(locp, locq, self.basistri.opmat('M7')))
+            )
+        elif fluxaa:
+            kernels['qptsu'] = lambda: self._be.kernel(
+                'mul', self.opmat('M7'), self.scal_upts_inb,
+                out=self._scal_qpts, nmex='qptsu',
             )
 
         # First flux correction kernel
-        if fluxaa:
+        if fluxaa and self.basis.name == 'hex':
+            M9facs = [np.kron(np.eye(self.ndims), m)
+                      for m in _utoq(self.basis.opmat('M8'))]
             kernels['tdivtpcorf'] = lambda: self._be.kernel(
                 'mul', self.opmat('(M1 - M3*M2)*M9'), self._vect_qpts,
-                out=self.scal_upts_outb
+                out=self.scal_upts_outb, nmex='tdivtpcorf',
+                a_facs=self.opmat_facs([self.basis.opmat('M1 - M3*M2')] + M9facs)
+            )
+        elif fluxaa and self.basis.name == 'pri':
+            locp = self.basis.upts[::self.basis.nupts // (self.basis.order + 1)][:, 2]
+            locq = self.basisq.upts[::self.basisq.nupts // (self.basisq.order + 1)][:, 2]
+            M9facspri = [np.kron(np.eye(self.ndims), m)
+                      for m in _utoq_pri(locq, locp, self.basistri.opmat('M8'))]
+            print('tdivtpcorf  shape', self.basis.opmat('M1-M3*M2').shape)
+            print('tdivtpcorf basistri', self.basistri.opmat('M8').shape, self.basistri.order)
+            print('utoqprishapes', [m.shape for m in _utoq_pri(locq, locp, self.basistri.opmat('M8'))])
+            kernels['tdivtpcorf'] = lambda: self._be.kernel(
+                'mul', self.opmat('(M1 - M3*M2)*M9'), self._vect_qpts,
+                out=self.scal_upts_outb, nmex='tdivtpcorf',
+                a_facs=self.opmat_facs([self.basis.opmat('M1 - M3*M2')] + M9facspri)
+            )
+        elif fluxaa:
+            kernels['tdivtpcorf'] = lambda: self._be.kernel(
+                'mul', self.opmat('(M1 - M3*M2)*M9'), self._vect_qpts,
+                out=self.scal_upts_outb, nmex='tdivtpcorf'
             )
         else:
             kernels['tdivtpcorf'] = lambda: self._be.kernel(
@@ -66,10 +120,25 @@ class BaseAdvectionElements(BaseElements):
             )
 
         # Second flux correction kernel
-        kernels['tdivtconf'] = lambda: self._be.kernel(
-            'mul', self.opmat('M3'), self._scal_fpts, out=self.scal_upts_outb,
-            beta=1.0, nmex='tdivtconf'
-        )
+        if 'surf-flux' in self.antialias and self.basis.name == 'hex':
+            M3facs = list(_utoq(self.basis.opmat('M8'))) + [self.basisq.opmat('M3')]
+            kernels['tdivtconf'] = lambda: self._be.kernel(
+                'mul', self.opmat('M3'), self._scal_fpts, out=self.scal_upts_outb,
+                beta=1.0, nmex='tdivtconf', a_facs=self.opmat_facs(M3facs)
+            )
+        elif 'surf-flux' in self.antialias and self.basis.name == 'pri':
+            locp = self.basis.upts[::self.basis.nupts // (self.basis.order + 1)][:, 2]
+            locq = self.basisq.upts[::self.basisq.nupts // (self.basisq.order + 1)][:, 2]
+            M3facspri = list(_utoq_pri(locq, locp, self.basistri.opmat('M8'))) + [self.basisq.opmat('M3')]
+            kernels['tdivtconf'] = lambda: self._be.kernel(
+                'mul', self.opmat('M3'), self._scal_fpts, out=self.scal_upts_outb,
+                beta=1.0, nmex='tdivtconf', a_facs=self.opmat_facs(M3facspri)
+            )
+        else:
+            kernels['tdivtconf'] = lambda: self._be.kernel(
+                'mul', self.opmat('M3'), self._scal_fpts, out=self.scal_upts_outb,
+                beta=1.0, nmex='tdivtconf'
+            )
 
         # Transformed to physical divergence kernel + source term
         plocupts = self.ploc_at('upts') if plocsrc else None

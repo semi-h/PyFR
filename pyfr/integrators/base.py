@@ -114,8 +114,12 @@ class BaseIntegrator(object):
         pass
 
     def run(self):
+        print('time now', time.time() - self._wstart)
         for t in self.tlist:
+            print('time now', time.time() - self._wstart)
             self.advance_to(t)
+
+        print('time now', time.time() - self._wstart)
 
     @property
     def nsteps(self):

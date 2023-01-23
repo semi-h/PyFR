@@ -8,6 +8,11 @@ from pyfr.util import memoize
 
 
 class _BaseKernel(object):
+    def __init__(self, mats=[], views=[], misc=[]):
+        self.mats = mats
+        self.views = views
+        self.misc = misc
+
     @property
     def retval(self):
         return None
@@ -61,7 +66,7 @@ class BasePointwiseKernelProvider(BaseKernelProvider):
     kernel_generator_cls = None
 
     @memoize
-    def _render_kernel(self, name, mod, extrns, tplargs):
+    def _render_kernel(self, name, mod, cdefs, inject, extrns, tplargs):
         # Copy the provided argument list
         tplargs = dict(tplargs)
 
@@ -77,9 +82,16 @@ class BasePointwiseKernelProvider(BaseKernelProvider):
         # Backchannel for obtaining kernel argument types
         tplargs['_kernel_argspecs'] = argspecs = {}
 
+        # C macro defs
+        tplargs['_cdefs'] = cdefs
+
+        # Injection
+        tplargs['_inject'] = inject
+
         # Render the template to yield the source code
         tpl = self.backend.lookup.get_template(mod)
         src = tpl.render(**tplargs)
+        #print('render_kernel, name, src', name, src)
         src = re.sub(r'\n\n+', r'\n\n', src)
 
         # Check the kernel exists in the template
@@ -105,6 +117,9 @@ class BasePointwiseKernelProvider(BaseKernelProvider):
         # Possible view types
         viewtypes = (self.backend.view_cls, self.backend.xchg_view_cls)
 
+        # Backend matrices and views this kernel operates on
+        argmats, argviews = [], []
+
         # First arguments are the iteration dimensions
         ndim, arglst = len(dims), [int(d) for d in dims]
 
@@ -121,6 +136,8 @@ class BasePointwiseKernelProvider(BaseKernelProvider):
 
             # Matrix
             if isinstance(ka, mattypes):
+                argmats.append(ka)
+
                 # Check that argument is not a row sliced matrix
                 if isinstance(ka, mattypes[-1]) and ka.nrow != ka.parent.nrow:
                     raise ValueError('Row sliced matrices are not supported')
@@ -128,6 +145,8 @@ class BasePointwiseKernelProvider(BaseKernelProvider):
                     arglst += [ka, ka.leaddim] if len(atypes) == 2 else [ka]
             # View
             elif isinstance(ka, viewtypes):
+                argviews.append(ka)
+
                 if isinstance(ka, self.backend.view_cls):
                     view = ka
                 else:
@@ -139,9 +158,9 @@ class BasePointwiseKernelProvider(BaseKernelProvider):
             else:
                 arglst.append(ka)
 
-        return arglst
+        return arglst, (argmats, argviews)
 
-    def _instantiate_kernel(self, dims, fun, arglst):
+    def _instantiate_kernel(self, dims, fun, arglst, argmv):
         pass
 
     def register(self, mod):
@@ -159,19 +178,23 @@ class BasePointwiseKernelProvider(BaseKernelProvider):
                 return
 
         # Generate the kernel providing method
-        def kernel_meth(self, tplargs, dims, extrns={}, **kwargs):
+        def kernel_meth(self, tplargs, dims, cdefs='', inject=[], extrns={},
+                        **kwargs):
             # Render the source of kernel
-            src, ndim, argn, argt = self._render_kernel(name, mod, extrns,
+            src, ndim, argn, argt = self._render_kernel(name, mod, cdefs,
+                                                        inject, extrns,
                                                         tplargs)
 
             # Compile the kernel
             fun = self._build_kernel(name, src, list(it.chain(*argt)))
 
             # Process the argument list
-            argb = self._build_arglst(dims, argn, argt, kwargs)
+            argb, argmv = self._build_arglst(dims, argn, argt, kwargs)
+            print('name', name, argb)
+            print('name externs', name, extrns)
 
             # Return a ComputeKernel subclass instance
-            return self._instantiate_kernel(dims, fun, argb)
+            return self._instantiate_kernel(dims, fun, argb, argmv)
 
         # Attach the module to the method as an attribute
         kernel_meth._mod = mod

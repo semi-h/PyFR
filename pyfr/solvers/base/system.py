@@ -125,7 +125,20 @@ class BaseSystem(object):
 
             try:
                 curved = ~mesh[k, 'linear']
+                print(curved)
                 linoff = np.max(*np.nonzero(curved), initial=-1) + 1
+
+                intoff = 0
+                lhsprank = rallocs.prank
+                for rhsprank in rallocs.prankconn[lhsprank]:
+                    interarr = mesh['con_p{0}p{1}'.format(lhsprank, rhsprank)]
+                    interarr = interarr[['f0', 'f1']].astype('U4,i4').tolist()
+
+                    for etype, eidx in interarr:
+                        intoff = max(eidx + 1, intoff)
+
+                suboff = max(intoff, linoff)
+                print('suboff, intoff, linoff', suboff, intoff, linoff)
             except KeyError:
                 linoff = ele.neles
 
@@ -252,39 +265,38 @@ class BaseSystem(object):
 
         provobjs = [item for item in args] #[*args]
 
+        self.krnlptrdict = dict()
+
         for pn, pobj in zip(provnames, provobjs):
-            for kn, kgetter in it.chain(*pobj.kernels.items()):
-                if not kn.startswith('_'):
-                    klambda = kgetter()
-                    if kn == 'tdivtpcorf':
-                        self.tdivtpcorf_exec = getattr(klambda, 'e_ptr')
-                        self.tdivtpcorf_blkk = getattr(klambda, 'b_ptr')
-                        #self.tdivtpcorf_func_ptr = getattr(klambda, 'func_ptr')
-                    if kn == 'tdivtconf':
-                        self.tdivtconf_exec = getattr(klambda, 'e_ptr')
-                        self.tdivtconf_blkk = getattr(klambda, 'b_ptr')
-                        #self.tdivtconf_func_ptr = getattr(klambda, 'func_ptr')
-                    if kn == 'tgradcoru_upts':
-                        self.tgradcoru_exec = getattr(klambda, 'e_ptr')
-                        self.tgradcoru_blkk = getattr(klambda, 'b_ptr')
-                        #self.tgradcoru_func_ptr = getattr(klambda, 'func_ptr')
-                    if kn == 'tgradpcoru_upts':
-                        self.tgradpcoru_exec = getattr(klambda, 'e_ptr')
-                        self.tgradpcoru_blkk = getattr(klambda, 'b_ptr')
-                        #self.tgradpcoru_func_ptr = getattr(klambda, 'func_ptr')
-                    if kn == 'gradcoru_fpts':
-                        self.gradcoru_fpts_exec = getattr(klambda, 'e_ptr')
-                        self.gradcoru_fpts_blkk = getattr(klambda, 'b_ptr')
-                        #self.gradcoru_fpts_func_ptr = getattr(klambda, 'func_ptr')
-                    if kn == 'disu':
-                        self.disu_exec = getattr(klambda, 'e_ptr')
-                        self.disu_blkk = getattr(klambda, 'b_ptr')
-                        #self.disu_func_ptr = getattr(klambda, 'func_ptr')
-                    if kn == 'qptsu':
-                        self.qptsu_exec = getattr(klambda, 'e_ptr')
-                        self.qptsu_blkk = getattr(klambda, 'b_ptr')
-                        #self.qptsu_func_ptr = getattr(klambda, 'func_ptr')
-                    kernels[pn, kn].append(klambda)
+            print('pobj', pobj, *pobj.kernels.items())
+            if pn == 'eles':
+                for ebank in pobj:
+                    for kn, kgetter in ebank.kernels.items():
+                        print('kn, kgetter', kn, kgetter, 'etype', ebank.basis.name)
+                        etype = ebank.basis.name
+                        if not kn.startswith('_'):
+                            klambda = kgetter()
+                            if hasattr(klambda, 'e_ptr'):
+                                self.krnlptrdict[kn+'_exec'+'_'+etype] =  getattr(klambda, 'e_ptr')
+                            if hasattr(klambda, 'b_ptr'):
+                                self.krnlptrdict[kn+'_blkk'+'_'+etype] =  getattr(klambda, 'b_ptr')
+                            if hasattr(klambda, 'bfac_ptr'):
+                                bfac_list = getattr(klambda, 'bfac_ptr')
+                                self.krnlptrdict.update({kn+'_blkk'+str(i)+'_'+etype:v for i, v in enumerate(bfac_list)})
+                            kernels[pn, kn].append(klambda)
+            else:
+                for kn, kgetter in it.chain(*pobj.kernels.items()):
+                    print('kn', kn, kgetter)
+                    if not kn.startswith('_'):
+                        klambda = kgetter()
+                        #if hasattr(klambda, 'e_ptr'):
+                        #    self.krnlptrdict[kn+'_exec'] =  getattr(klambda, 'e_ptr')
+                        #if hasattr(klambda, 'b_ptr'):
+                        #    self.krnlptrdict[kn+'_blkk'] =  getattr(klambda, 'b_ptr')
+                        #if hasattr(klambda, 'bfac_ptr'):
+                        #    bfac_list = getattr(klambda, 'bfac_ptr')
+                        #    self.krnlptrdict.update({kn+'_blkk'+str(i):v for i, v in enumerate(bfac_list)})
+                        kernels[pn, kn].append(klambda)
 
     def rhs(self, t, uinbank, foutbank):
         pass
