@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from ctypes import cast, c_int, c_double, c_float, c_void_p
+from ctypes import cast, c_int, c_double, c_float, c_ulonglong, c_void_p
 
 import numpy as np
 
@@ -17,13 +17,14 @@ class XSMMWrappers(LibWrapper):
         (None, 'libxsmm_init'),
         (None, 'libxsmm_finalize'),
         (c_void_p, 'libxsmm_dfsspmdm_create', c_int, c_int, c_int, c_int,
-         c_int, c_int, c_double, c_double, c_int, c_void_p),
+         c_int, c_int, c_double, c_double, c_void_p, c_int, c_void_p),
         (c_void_p, 'libxsmm_sfsspmdm_create', c_int, c_int, c_int, c_int,
-         c_int, c_int, c_float, c_float, c_int, c_void_p),
+         c_int, c_int, c_float, c_float, c_void_p, c_int, c_void_p),
         (None, 'libxsmm_dfsspmdm_execute', c_void_p, c_void_p, c_void_p),
         (None, 'libxsmm_sfsspmdm_execute', c_void_p, c_void_p, c_void_p),
         (None, 'libxsmm_dfsspmdm_destroy', c_void_p),
-        (None, 'libxsmm_sfsspmdm_destroy', c_void_p)
+        (None, 'libxsmm_sfsspmdm_destroy', c_void_p),
+        (c_ulonglong, 'libxsmm_timer_tick')
     ]
 
 
@@ -118,9 +119,11 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
             a_np = np.ascontiguousarray(a.get())
             m, k = a_np.shape
 
+            timer_tick = cast(self._wrappers.libxsmm_timer_tick, c_void_p)
+
             # JIT and register an block leaddim size kernel for this matrix
             blkptr = self._createfn(m, b.leaddim, k, k, ldb, ldc, alpha,
-                                    beta, c_is_nt, a_np.ctypes.data)
+                                    beta, a_np.ctypes.data, c_is_nt, timer_tick)
             #print('blkptr', blkptr)
 
             if a_facs:
@@ -137,7 +140,7 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
                         _c_is_nt = 0
                     blkptr_facs.append(
                         self._createfn(m, b.leaddim, kk, kk, ldb, ldc, alpha,
-                                       _beta, _c_is_nt, mat.ctypes.data)
+                                       _beta, mat.ctypes.data, _c_is_nt, timer_tick)
                     )
                     if not blkptr_facs[-1]:
                         raise NotSuitableError('libxssm unable to JIT a tensor product kernel')
