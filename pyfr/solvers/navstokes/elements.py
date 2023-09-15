@@ -97,14 +97,14 @@ class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
                 for i in range(self.ndims+1):
                     extrnl_args['tdivtpcorf_blkk'+str(i)+'_'+etype] = 'in fptr vptr'
                 qptsu = f'''
-                    fpdtype_t buffqpts[nqpts*BLK_SZ*nvars];
-                    fpdtype_t buffuq[nqpts*BLK_SZ*nvars];
+                    fpdtype_t alignas(64) buffqpts[nqpts*BLK_SZ*nvars];
+                    fpdtype_t alignas(64) buffuq[nqpts*BLK_SZ*nvars];
                     qptsu_exec_{etype}(qptsu_blkk2_{etype}, uu_v+ib*BLK_SZ*nvars*nupts, buffuq);
                     qptsu_exec_{etype}(qptsu_blkk1_{etype}, buffuq, buffqpts);
                     qptsu_exec_{etype}(qptsu_blkk0_{etype}, buffqpts, buffuq);
                 '''
                 gradcoru_qpts = f'''
-                    fpdtype_t buffqout[nqpts*ndims*BLK_SZ*nvars];
+                    fpdtype_t alignas(64) buffqout[nqpts*ndims*BLK_SZ*nvars];
                     qptsu_exec_{etype}(qptsu_blkk2_{etype}, gbuff, buffqout);
                     qptsu_exec_{etype}(qptsu_blkk1_{etype}, buffqout, buffqpts);
                     qptsu_exec_{etype}(qptsu_blkk0_{etype}, buffqpts, buffqout);
@@ -117,8 +117,8 @@ class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
                 '''
                 tdivtpcorf = f'''
                     //tdivtpcorf_exec_{etype}(tdivtpcorf_blkk_{etype}, buffqout, uout_v+ib*BLK_SZ*nvars*nupts);
-                    fpdtype_t buffuout[nqpts*ndims*BLK_SZ*nvars];
-                    fpdtype_t buffuout2[nqpts*ndims*BLK_SZ*nvars];
+                    fpdtype_t alignas(64) buffuout[nqpts*ndims*BLK_SZ*nvars];
+                    fpdtype_t alignas(64) buffuout2[nqpts*ndims*BLK_SZ*nvars];
                     tdivtpcorf_exec_{etype}(tdivtpcorf_blkk3_{etype}, buffqout, buffuout);
                     tdivtpcorf_exec_{etype}(tdivtpcorf_blkk2_{etype}, buffuout, buffuout2);
                     tdivtpcorf_exec_{etype}(tdivtpcorf_blkk1_{etype}, buffuout2, buffuout);
@@ -131,13 +131,13 @@ class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
                     extrnl_args['tdivtpcorf_blkk'+str(i)+'_'+etype] = 'in fptr vptr'
 
                 qptsu = f'''
-                    fpdtype_t buffqpts[nqpts*BLK_SZ*nvars];
-                    fpdtype_t buffuq[nqpts*BLK_SZ*nvars];
+                    fpdtype_t alignas(64) buffqpts[nqpts*BLK_SZ*nvars];
+                    fpdtype_t alignas(64) buffuq[nqpts*BLK_SZ*nvars];
                     qptsu_exec_{etype}(qptsu_blkk1_{etype}, uu_v+ib*BLK_SZ*nvars*nupts, buffqpts);
                     qptsu_exec_{etype}(qptsu_blkk0_{etype}, buffqpts, buffuq);
                 '''
                 gradcoru_qpts = f'''
-                    fpdtype_t buffqout[nqpts*ndims*BLK_SZ*nvars];
+                    fpdtype_t alignas(64) buffqout[nqpts*ndims*BLK_SZ*nvars];
                     qptsu_exec_{etype}(qptsu_blkk1_{etype}, gbuff, buffqpts);
                     qptsu_exec_{etype}(qptsu_blkk0_{etype}, buffqpts, buffqout);
                     qptsu_exec_{etype}(qptsu_blkk1_{etype}, gbuff+BLK_SZ*nvars*nupts, buffqpts);
@@ -147,19 +147,19 @@ class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
                 '''
                 tdivtpcorf = f'''
                     //tdivtpcorf_exec_{etype}(tdivtpcorf_blkk_{etype}, buffqout, uout_v+ib*BLK_SZ*nvars*nupts);
-                    fpdtype_t buffuout[nqpts*ndims*BLK_SZ*nvars];
-                    fpdtype_t buffuout2[nqpts*ndims*BLK_SZ*nvars];
+                    fpdtype_t alignas(64) buffuout[nqpts*ndims*BLK_SZ*nvars];
+                    fpdtype_t alignas(64) buffuout2[nqpts*ndims*BLK_SZ*nvars];
                     tdivtpcorf_exec_{etype}(tdivtpcorf_blkk2_{etype}, buffqout, buffuout);
                     tdivtpcorf_exec_{etype}(tdivtpcorf_blkk1_{etype}, buffuout, buffuout2);
                     tdivtpcorf_exec_{etype}(tdivtpcorf_blkk0_{etype}, buffuout2, uout_v+ib*BLK_SZ*nvars*nupts);
                 '''
             else:
                 qptsu = f'''
-                    fpdtype_t buffuq[nqpts*BLK_SZ*nvars];
+                    fpdtype_t alignas(64) buffuq[nqpts*BLK_SZ*nvars];
                     qptsu_exec_{etype}(qptsu_blkk_{etype}, uu_v+ib*BLK_SZ*nvars*nupts, buffuq);
                 '''
                 gradcoru_qpts = f'''
-                    fpdtype_t buffqout[nqpts*ndims*BLK_SZ*nvars];
+                    fpdtype_t alignas(64) buffqout[nqpts*ndims*BLK_SZ*nvars];
                     qptsu_exec_{etype}(qptsu_blkk_{etype}, gbuff, buffqout);
                     qptsu_exec_{etype}(qptsu_blkk_{etype}, gbuff+BLK_SZ*nvars*nupts, buffqout+BLK_SZ*nvars*nqpts);
                     qptsu_exec_{etype}(qptsu_blkk_{etype}, gbuff+2*BLK_SZ*nvars*nupts, buffqout+2*BLK_SZ*nvars*nqpts);
@@ -176,7 +176,7 @@ class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
             pts, npts = 'upts', self.nupts
 
             tgradpcoru = f'tgradpcoru_upts_exec_{etype}(tgradpcoru_upts_blkk_{etype}, u_v+ib*BLK_SZ*nvars*nupts, buffarr);'
-            gradcoru_qpts = 'fpdtype_t buffout[nupts*ndims*BLK_SZ*nvars];'
+            gradcoru_qpts = 'fpdtype_t alignas(64) buffout[nupts*ndims*BLK_SZ*nvars];'
             qptsu = ''
             #tdivtpcorf = 'tdivtpcorf_exec(tdivtpcorf_blkk, buffarr, uout_v+ib*BLK_SZ*nvars*nupts);'
             tdivtpcorf = f'tdivtpcorf_exec_{etype}(tdivtpcorf_blkk_{etype}, buffout, uout_v+ib*BLK_SZ*nvars*nupts);'
@@ -186,15 +186,15 @@ class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
                 extrnl_args['tgradcoru_upts_blkk'+str(i)+'_'+etype] = 'in fptr vptr'
                 extrnl_args['disu_blkk'+str(i)+'_'+etype] = 'in fptr vptr'
             tgradcoru = f'''
-                fpdtype_t g2buff[nupts*ndims*BLK_SZ*nvars];
+                fpdtype_t alignas(64) g2buff[nupts*ndims*BLK_SZ*nvars];
                 tgradcoru_upts_exec_{etype}(tgradcoru_upts_blkk3_{etype}, c_v+ib*ndims*BLK_SZ*nvars*nfpts, gbuff);
                 tgradcoru_upts_exec_{etype}(tgradcoru_upts_blkk2_{etype}, gbuff, g2buff);
                 tgradcoru_upts_exec_{etype}(tgradcoru_upts_blkk1_{etype}, g2buff, gbuff);
                 tgradcoru_upts_exec_{etype}(tgradcoru_upts_blkk0_{etype}, gbuff, buffarr);
             '''
             tgradcoru = f'''
-                fpdtype_t gqbuff[nqpts*ndims*BLK_SZ*nvars];
-                fpdtype_t gqbuff2[nqpts*ndims*BLK_SZ*nvars];
+                fpdtype_t alignas(64) gqbuff[nqpts*ndims*BLK_SZ*nvars];
+                fpdtype_t alignas(64) gqbuff2[nqpts*ndims*BLK_SZ*nvars];
                 tgradcoru_upts_exec_{etype}(tgradcoru_upts_blkk3_{etype}, c_v+ib*ndims*BLK_SZ*nvars*nfpts, gqbuff);
                 tgradcoru_upts_exec_{etype}(tgradcoru_upts_blkk2_{etype}, gqbuff, gqbuff2);
                 tgradcoru_upts_exec_{etype}(tgradcoru_upts_blkk1_{etype}, gqbuff2, gqbuff);
@@ -202,8 +202,8 @@ class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
             '''
             #tgradcoru = 'tgradcoru_upts_exec(tgradcoru_upts_blkk, c_v+ib*ndims*BLK_SZ*nvars*nfpts, buffarr);'
             gradcoru_fpts = f'''
-                fpdtype_t fptsbuff[nfpts*BLK_SZ*nvars];
-                fpdtype_t fptsbuff2[nfpts*BLK_SZ*nvars];
+                fpdtype_t alignas(64) fptsbuff[nfpts*BLK_SZ*nvars];
+                fpdtype_t alignas(64) fptsbuff2[nfpts*BLK_SZ*nvars];
                 disu_exec_{etype}(disu_blkk3_{etype}, gbuff, fptsbuff);
                 disu_exec_{etype}(disu_blkk2_{etype}, fptsbuff, fptsbuff2);
                 disu_exec_{etype}(disu_blkk1_{etype}, fptsbuff2, fptsbuff);
@@ -222,15 +222,15 @@ class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
                 extrnl_args['tgradcoru_upts_blkk'+str(i)+'_'+etype] = 'in fptr vptr'
                 extrnl_args['disu_blkk'+str(i)+'_'+etype] = 'in fptr vptr'
             tgradcoru = f'''
-                fpdtype_t gqbuff[nqpts*ndims*BLK_SZ*nvars];
-                fpdtype_t gqbuff2[nqpts*ndims*BLK_SZ*nvars];
+                fpdtype_t alignas(64) gqbuff[nqpts*ndims*BLK_SZ*nvars];
+                fpdtype_t alignas(64) gqbuff2[nqpts*ndims*BLK_SZ*nvars];
                 tgradcoru_upts_exec_{etype}(tgradcoru_upts_blkk2_{etype}, c_v+ib*ndims*BLK_SZ*nvars*nfpts, gqbuff);
                 tgradcoru_upts_exec_{etype}(tgradcoru_upts_blkk1_{etype}, gqbuff, gqbuff2);
                 tgradcoru_upts_exec_{etype}(tgradcoru_upts_blkk0_{etype}, gqbuff2, buffarr);
             '''
             #tgradcoru = 'tgradcoru_upts_exec(tgradcoru_upts_blkk, c_v+ib*ndims*BLK_SZ*nvars*nfpts, buffarr);'
             gradcoru_fpts = f'''
-                fpdtype_t fptsbuff[nfpts*BLK_SZ*nvars];
+                fpdtype_t alignas(64) fptsbuff[nfpts*BLK_SZ*nvars];
                 disu_exec_{etype}(disu_blkk2_{etype}, gbuff, c_v+(ib*ndims)*BLK_SZ*nvars*nfpts);
                 disu_exec_{etype}(disu_blkk1_{etype}, c_v+(ib*ndims)*BLK_SZ*nvars*nfpts, fptsbuff);
                 disu_exec_{etype}(disu_blkk0_{etype}, fptsbuff, c_v+(ib*ndims)*BLK_SZ*nvars*nfpts);
@@ -253,8 +253,8 @@ class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
                 gradcoru_fpts += f'''disu_exec_{etype}(disu_blkk_{etype}, gbuff+{i}*BLK_SZ*nvars*nupts, c_v+(ib*ndims+{i})*BLK_SZ*nvars*nfpts);\n'''
 
         inject.append(f'''
-            fpdtype_t buffarr[nupts*ndims*BLK_SZ*nvars];
-            fpdtype_t gbuff[nupts*ndims*BLK_SZ*nvars];
+            fpdtype_t alignas(64) buffarr[nupts*ndims*BLK_SZ*nvars];
+            fpdtype_t alignas(64) gbuff[nupts*ndims*BLK_SZ*nvars];
             //for (int ij = 0; ij < nupts*BLK_SZ*nvars; ij++) printf("%d u_v %d %d %f \\n", nupts, ib, ij, u_v[ij]);
             //for (int ij = 0; ij < nfpts*BLK_SZ*nvars; ij++) printf("%d c_v %d %d %f \\n", nfpts, ib, ij, c_v[ij]);
             {tgradpcoru}
@@ -324,8 +324,8 @@ class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
                 extrnl_argsneg['tdivtconf_blkk'+str(i)+'_'+etype] = 'in fptr vptr'
             injectneg.append(f'''
                 //tdivtconf_exec(tdivtconf_blkk, d_v+ib*BLK_SZ*nvars*nfpts, tdivtconf_v+ib*BLK_SZ*nvars*nupts);
-                fpdtype_t buffuout[nqpts*ndims*BLK_SZ*nvars];
-                fpdtype_t buffuout2[nqpts*ndims*BLK_SZ*nvars];
+                fpdtype_t alignas(64) buffuout[nqpts*ndims*BLK_SZ*nvars];
+                fpdtype_t alignas(64) buffuout2[nqpts*ndims*BLK_SZ*nvars];
                 tdivtconf_exec_{etype}(tdivtconf_blkk3_{etype}, d_v+ib*BLK_SZ*nvars*nfpts, buffuout);
                 tdivtconf_exec_{etype}(tdivtconf_blkk2_{etype}, buffuout, buffuout2);
                 tdivtconf_exec_{etype}(tdivtconf_blkk1_{etype}, buffuout2, buffuout);
@@ -336,8 +336,8 @@ class NavierStokesElements(BaseFluidElements, BaseAdvectionDiffusionElements):
                 extrnl_argsneg['tdivtconf_blkk'+str(i)+'_'+etype] = 'in fptr vptr'
             injectneg.append(f'''
                 //tdivtconf_exec(tdivtconf_blkk, d_v+ib*BLK_SZ*nvars*nfpts, tdivtconf_v+ib*BLK_SZ*nvars*nupts);
-                fpdtype_t buffuout[nqpts*ndims*BLK_SZ*nvars];
-                fpdtype_t buffuout2[nqpts*ndims*BLK_SZ*nvars];
+                fpdtype_t alignas(64) buffuout[nqpts*ndims*BLK_SZ*nvars];
+                fpdtype_t alignas(64) buffuout2[nqpts*ndims*BLK_SZ*nvars];
                 tdivtconf_exec_{etype}(tdivtconf_blkk2_{etype}, d_v+ib*BLK_SZ*nvars*nfpts, buffuout);
                 tdivtconf_exec_{etype}(tdivtconf_blkk1_{etype}, buffuout, buffuout2);
                 tdivtconf_exec_{etype}(tdivtconf_blkk0_{etype}, buffuout2, tdivtconf_v+ib*BLK_SZ*nvars*nupts);

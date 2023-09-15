@@ -121,6 +121,7 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
             # JIT and register an block leaddim size kernel for this matrix
             blkptr = self._createfn(m, b.leaddim, k, k, ldb, ldc, alpha,
                                     beta, c_is_nt, a_np.ctypes.data)
+            #print('blkptr', blkptr)
 
             if a_facs:
                 blkptr_facs = []
@@ -173,6 +174,17 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
         # Build
         #par_xsmm = self._build_kernel(name, src.replace('par_xsmm', name),
         #                              argt)
+
+        # try executing xsmm kernels here
+        #print('bnrow bleaddim', b.nrow, b.leaddim, out.nrow, out.leaddim)
+        #print('a sizes', a.get().shape)
+        #print('blkptr', blkptr)
+        #bfake = np.ones((b.nrow, b.leaddim), dtype=np.float64)
+        #outfake = np.zeros((out.nrow, out.leaddim), dtype=np.float64)
+
+        #print('try to execute ', nmex)
+        ##self._execfn(blkptr, bfake.ctypes.data, outfake.ctypes.data)
+        #print('after execute ', nmex)
 
         class MulKernel(ComputeKernel):
             func_ptr = cast(batch_gemm, c_void_p).value

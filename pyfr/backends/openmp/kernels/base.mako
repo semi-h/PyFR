@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <tgmath.h>
 #include <stdio.h>
+#include <stdalign.h>
 
 #define SOA_SZ ${soasz}
 #define BLK_SZ ${csubsz}
