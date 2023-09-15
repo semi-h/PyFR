@@ -150,18 +150,18 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
         # Obtain a pointer to the execute function
         execptr = cast(self._execfn, c_void_p).value
 
-        if nmex == 'disu' and a_facs:
+        if nmex == 'disu' and len(a_facs) == 4:
             krnl = 'disut'
-        elif nmex == 'disu':
+        elif nmex == 'disu' and len(a_facs) == 3:
             krnl = 'disup'
         # Render our parallel wrapper kernel
         src = self.backend.lookup.get_template('batch-gemm').render(
-            lib='xsmm', krnl=nmex + 't' if nmex=='disu' and a_facs else nmex
+            lib='xsmm', krnl=krnl if nmex=='disu' and a_facs else nmex
         )
 
         # Argument types for batch_gemm
         if nmex=='disu' and a_facs:
-            argt = [np.intp]*4 + [np.intp, np.int32]*3
+            argt = [np.intp]*len(a_facs) + [np.intp, np.int32]*3
         else:
             argt = [np.intp] + [np.intp, np.int32]*3
 

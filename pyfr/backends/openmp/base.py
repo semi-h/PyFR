@@ -48,7 +48,7 @@ class OpenMPBackend(BaseBackend):
         except OSError:
             pass
 
-        self._providers.append(gimmik.OpenMPGiMMiKKernels(self))
+        #self._providers.append(gimmik.OpenMPGiMMiKKernels(self))
 
         # Pointwise kernels
         self.pointwise = self._providers[0]

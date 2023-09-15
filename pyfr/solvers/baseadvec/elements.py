@@ -58,7 +58,7 @@ class BaseAdvectionElements(BaseElements):
             M0facspri = [self.basisq.opmat('M0')] + list(_utoq_pri(locp, locq, self.basistri.opmat('M7')))
             kernels['disu'] = lambda: self._be.kernel(
                 'mul', self.opmat('M0'), self.scal_upts_inb,
-                out=self._scal_fpts, nmex='disupri', a_facs=self.opmat_facs(M0facspri)
+                out=self._scal_fpts, nmex='disu', a_facs=self.opmat_facs(M0facspri)
             )
         else:
             kernels['disu'] = lambda: self._be.kernel(

@@ -14,6 +14,8 @@ void
 % if lib == 'xsmm':
 % if krnl == 'disut':
 batch_gemm(libxsmm_xfsspmdm_execute exec, void *blockk0, void *blockk1, void *blockk2, void *blockk3,
+% elif krnl == 'disup':
+batch_gemm(libxsmm_xfsspmdm_execute exec, void *blockk0, void *blockk1, void *blockk2,
 % else:
 batch_gemm(libxsmm_xfsspmdm_execute exec, void *blockk,
 % endif
