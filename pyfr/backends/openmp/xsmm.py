@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from ctypes import cast, c_int, c_double, c_float, c_void_p
+from ctypes import cast, c_int, c_double, c_float, c_ulonglong, c_void_p
 
 import numpy as np
 
@@ -17,13 +17,14 @@ class XSMMWrappers(LibWrapper):
         (None, 'libxsmm_init'),
         (None, 'libxsmm_finalize'),
         (c_void_p, 'libxsmm_dfsspmdm_create', c_int, c_int, c_int, c_int,
-         c_int, c_int, c_double, c_double, c_int, c_void_p),
+         c_int, c_int, c_double, c_double, c_void_p, c_int, c_void_p),
         (c_void_p, 'libxsmm_sfsspmdm_create', c_int, c_int, c_int, c_int,
-         c_int, c_int, c_float, c_float, c_int, c_void_p),
+         c_int, c_int, c_float, c_float, c_void_p, c_int, c_void_p),
         (None, 'libxsmm_dfsspmdm_execute', c_void_p, c_void_p, c_void_p),
         (None, 'libxsmm_sfsspmdm_execute', c_void_p, c_void_p, c_void_p),
         (None, 'libxsmm_dfsspmdm_destroy', c_void_p),
-        (None, 'libxsmm_sfsspmdm_destroy', c_void_p)
+        (None, 'libxsmm_sfsspmdm_destroy', c_void_p),
+        (c_ulonglong, 'libxsmm_timer_tick')
     ]
 
 
@@ -108,16 +109,18 @@ class OpenMPXSMMKernels(OpenMPKernelProvider):
         except KeyError:
             c_is_nt = beta == 0 and self.backend.alignb >= 64
 
+            timer_tick = cast(self._wrappers.libxsmm_timer_tick, c_void_p)
+
             # JIT and register an nblock size kernel for this matrix
             blkptr = self._createfn(m, nblock, k, lda, ldb, ldc, alpha,
-                                    beta, c_is_nt, a)
+                                    beta, a, c_is_nt, timer_tick)
             if not blkptr:
                 raise NotSuitableError('libxssm unable to JIT a kernel')
 
             # If necessary, also JIT and register a clean-up kernel
             if n % nblock != 0:
                 cleanptr = self._createfn(m, n % nblock, k, lda, ldb, ldc,
-                                          alpha, beta, c_is_nt, a)
+                                          alpha, beta, a, c_is_nt, timer_tick)
                 if not cleanptr:
                     self._destroyfn(blkptr)
                     raise NotSuitableError('libxssm unable to JIT a kernel')
