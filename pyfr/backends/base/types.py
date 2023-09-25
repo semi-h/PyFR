@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from collections import Sequence, deque
+from collections.abc import Sequence
+from collections import deque
 
 import numpy as np
 
