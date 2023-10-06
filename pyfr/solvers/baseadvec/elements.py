@@ -42,15 +42,14 @@ class BaseAdvectionElements(BaseElements):
         }
 
         # Interpolation from elemental points
+        kernels['disu'] = lambda: self._be.kernel(
+            'mul', self.opmat('M0'), self.scal_upts_inb,
+            out=self._scal_fpts
+        )
         if fluxaa:
-            kernels['disu'] = lambda: self._be.kernel(
-                'mul', self.opmat('M8'), self.scal_upts_inb,
-                out=self._scal_fqpts
-            )
-        else:
-            kernels['disu'] = lambda: self._be.kernel(
-                'mul', self.opmat('M0'), self.scal_upts_inb,
-                out=self._scal_fpts
+            kernels['qptsu'] = lambda: self._be.kernel(
+                'mul', self.opmat('M7'), self.scal_upts_inb,
+                out=self._scal_qpts
             )
 
         # First flux correction kernel
